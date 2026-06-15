@@ -1,0 +1,8 @@
+# Caddy reverse proxy with automatic HTTPS (Let's Encrypt).
+# Replace the domain below with the value of DOMAIN in your .env file.
+# Caddy needs a DNS A record pointing this domain at the VPS IP, and
+# ports 80 + 443 open, before it can issue a certificate.
+
+{$DOMAIN} {
+	reverse_proxy n8n:5678
+}

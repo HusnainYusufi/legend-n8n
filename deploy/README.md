@@ -79,17 +79,26 @@ create your admin login.
    | Port | `465` |
    | SSL/TLS | ON |
 
-4. Finish the column mapping in the **Transform A → B** node.
-5. Toggle the workflow **Active** (top-right). The Form Trigger now exposes a
-   public URL: `https://<your-domain>/form/...` — share that with customers.
+4. Open the **Build Odoo File** node and edit the `COLS` map at the top so each
+   field points at the real header names in your Salla export. (The source of
+   this code lives in [`../workflow/transform.js`](../workflow/transform.js); run
+   `node workflow/build.mjs` to regenerate the workflow JSON after editing.)
+5. Toggle the workflow **Active** (top-right). The Form Trigger exposes a public
+   URL: `https://<your-domain>/form/...`. Open it, upload the Salla export, enter
+   the **Series Number** + **Report Date**, and the result is emailed to you.
 
 ## 6. Common operations
 
 ```bash
-docker compose pull && docker compose up -d   # update n8n to latest
-docker compose down                           # stop (keeps data volumes)
-docker compose logs -f n8n                     # tail logs
+docker compose build --pull && docker compose up -d   # rebuild + update n8n
+docker compose down                                   # stop (keeps data volumes)
+docker compose logs -f n8n                             # tail logs
 ```
+
+> The n8n service is built from [`Dockerfile`](Dockerfile), which bundles the
+> `exceljs` library. The Code node uses it (allowed via
+> `NODE_FUNCTION_ALLOW_EXTERNAL=exceljs`) to build the styled, two-tab `.xlsx`.
+> If you change the image, rebuild with `docker compose build --pull`.
 
 ## 7. Backups (do not skip)
 

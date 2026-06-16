@@ -201,6 +201,18 @@ for (const row of rows) {
 }
 
 // ── BUILD STYLED WORKBOOK ────────────────────────────────────────────────────
+// IMPORTANT: assign each cell value explicitly via getCell().value. ExcelJS's
+// addRow([...]) array form does NOT persist values inside n8n's Code-node
+// sandbox (the written file comes out with empty rows), so we avoid it.
+function writeRow(ws, rowIdx, values) {
+	const row = ws.getRow(rowIdx);
+	for (let i = 0; i < values.length; i++) {
+		const v = values[i];
+		row.getCell(i + 1).value = v === undefined ? null : v;
+	}
+	return row;
+}
+
 function styleHeader(rowObj, count) {
 	for (let i = 1; i <= count; i++) {
 		const cell = rowObj.getCell(i);
@@ -219,9 +231,9 @@ const wb = new ExcelJS.Workbook();
 // Tab 1 — Customer Data
 const ws1 = wb.addWorksheet('Customer Data');
 const custHeaders = ['Complete Name', 'Mobile', 'City', 'Street', 'Country', 'Is a Company'];
-ws1.addRow(custHeaders);
+writeRow(ws1, 1, custHeaders);
 styleHeader(ws1.getRow(1), custHeaders.length);
-for (const c of customers) ws1.addRow(custHeaders.map((h) => c[h]));
+customers.forEach((c, idx) => writeRow(ws1, idx + 2, custHeaders.map((h) => c[h])));
 
 // Tab 2 — Order Data
 const ws2 = wb.addWorksheet('Order Data');
@@ -236,10 +248,10 @@ const orderHeaders = [
 	'Warehouse',
 	'order_line/analytic_distribution',
 ];
-ws2.addRow(orderHeaders);
+writeRow(ws2, 1, orderHeaders);
 styleHeader(ws2.getRow(1), orderHeaders.length);
-for (const r of orderRows) {
-	const added = ws2.addRow([
+orderRows.forEach((r, idx) => {
+	const row = writeRow(ws2, idx + 2, [
 		r.orderRef,
 		r.product,
 		r.unitPrice,
@@ -250,12 +262,12 @@ for (const r of orderRows) {
 		r.warehouse,
 		r.analytic,
 	]);
-	if (r.orderRefRed) redCell(added.getCell(1));
-	if (r.productRed) redCell(added.getCell(2));
-}
+	if (r.orderRefRed) redCell(row.getCell(1));
+	if (r.productRed) redCell(row.getCell(2));
+});
 
-ws1.columns.forEach((col) => (col.width = 24));
-ws2.columns.forEach((col) => (col.width = 24));
+for (let i = 1; i <= custHeaders.length; i++) ws1.getColumn(i).width = 24;
+for (let i = 1; i <= orderHeaders.length; i++) ws2.getColumn(i).width = 24;
 
 // ── OUTPUT ───────────────────────────────────────────────────────────────────
 const fileName = `${reportDate || 'salla'} salla-odoo.xlsx`;

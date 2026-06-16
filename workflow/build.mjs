@@ -46,7 +46,12 @@ const workflow = {
 							requiredField: true,
 						},
 						{ fieldLabel: 'Series Number', fieldType: 'number', requiredField: true },
-						{ fieldLabel: 'Report Date', fieldType: 'date', requiredField: true },
+						{
+							fieldLabel: 'Report Date',
+							fieldType: 'text',
+							placeholder: 'e.g. 15June2026 (used in the file name)',
+							requiredField: true,
+						},
 						{ fieldLabel: 'Send To Email', fieldType: 'email', requiredField: true },
 					],
 				},

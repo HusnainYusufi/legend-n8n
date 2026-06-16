@@ -79,3 +79,6 @@ packages/cli/src/commands/export/outputs
 lefthook-local.yml
 .playwright-mcp
 stryker.log
+
+# Local sample data with customer PII — never commit
+/files/

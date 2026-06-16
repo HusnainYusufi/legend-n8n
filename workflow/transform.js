@@ -1,38 +1,42 @@
 // ============================================================================
 //  Salla orders  ->  Odoo import .xlsx  (two tabs, styled)
-//  This is the body of the n8n "Build Odoo File" Code node.
-//  Runs once for all items. Input = rows from "Extract from File".
+//  Body of the n8n "Build Odoo File" Code node. Runs once for all items.
+//  Input  = rows from "Extract from File" (the raw Salla export).
 //  Output = one item with the generated .xlsx in binary field `data`.
-//
-//  Requires the `exceljs` module (bundled into the Docker image, allowed via
-//  NODE_FUNCTION_ALLOW_EXTERNAL=exceljs).
+//  Requires the `exceljs` module (bundled in the Docker image,
+//  allowed via NODE_FUNCTION_ALLOW_EXTERNAL=exceljs).
 // ============================================================================
 const ExcelJS = require('exceljs');
 
-// ── CONFIG ──────────────────────────────────────────────────────────────────
-// Map each logical field to the candidate header names in your Salla export.
-// The first candidate that exists in the row is used (case/space-insensitive).
-// After your first test run, set these to the EXACT header text from your file.
+// ── CONFIG: Salla export column headers (exact, with fallbacks) ──────────────
 const COLS = {
-	orderRef: ['Order Reference', 'order_reference', 'reference', 'order_id', 'id', 'رقم الطلب', 'رقم الطلب #'],
-	name: ['Complete Name', 'customer_name', 'name', 'full_name', 'الاسم', 'اسم العميل', 'العميل'],
-	mobile: ['Mobile', 'mobile', 'phone', 'الجوال', 'رقم الجوال'],
-	city: ['City', 'city', 'المدينة'],
-	street: ['Street', 'address', 'street', 'العنوان'],
-	payment: ['Payment Method', 'payment_method', 'payment', 'طريقة الدفع', 'طريقة الدفع'],
+	orderRef: ['رقم الطلب', 'Order Reference', 'order_id', 'id'],
+	name: ['اسم العميل', 'Complete Name', 'customer_name', 'name'],
+	mobile: ['رقم الجوال', 'Mobile', 'mobile', 'phone'],
+	city: ['المدينة', 'City', 'city'],
+	street: ['عنوان العميل', 'Street', 'address'],
+	payment: ['طريقة الدفع', 'Payment Method', 'payment'],
 	shipping: ['تكلفة الشحن', 'shipping_cost', 'shipping'],
 	skus: ['skus_json'],
 };
 
-// final_price in skus_json is treated as a LINE TOTAL, so unit price = total / qty.
-// If your final_price is already per-unit, set this to false.
+// skus_json item layout: [product_name, qty, sku_code, original_price, final_price]
+const I_QTY = 1;
+const I_SKU = 2;
+const I_FINAL = 4;
+// final_price is the LINE TOTAL -> unit price = final_price / qty.
 const DIVIDE_PRICE_BY_QTY = true;
 
 // Fixed values
 const SALESPERSON = 'Legend Sleep Online';
 const COUNTRY = 'Saudi Arabia';
-const IS_A_COMPANY = 'False';
+const IS_A_COMPANY = false;
 const ANALYTIC = '{"3": 100}';
+
+// Styling (matches the reference file)
+const BLUE = 'FF4472C4';
+const RED = 'FFFF0000';
+const WHITE = 'FFFFFFFF';
 
 // ── DAILY INPUTS (from the upload form) ──────────────────────────────────────
 const form = $('On form submission').first().json;
@@ -63,22 +67,33 @@ function num(v) {
 	return isNaN(n) ? 0 : n;
 }
 
+function round2(n) {
+	return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+function paymentPrefix(p) {
+	const s = String(p ?? '').trim();
+	const low = s.toLowerCase();
+	if (s.includes('مدى') || low.includes('mada')) return 'Mada/Span';
+	if (s.includes('تابي') || low.includes('tabby')) return 'Tabby';
+	if (s.includes('ئتمان') || low.includes('credit')) return 'Credit Card';
+	if (s.includes('تمارا') || low.includes('tamara')) return 'Tamara';
+	if (s.includes('إمكان') || s.includes('امكان') || low.includes('emkan')) return 'Emkan';
+	if (low.includes('apple')) return 'Mada/Span';
+	if (low.includes('mispay')) return 'MisPAY';
+	return s; // unknown -> pass through with the suffix
+}
+
 function mapPayment(p) {
-	const s = String(p ?? '').trim().toLowerCase();
-	if (s.includes('مدى') || s.includes('mada')) return 'Mada/Span- Legend Sleep E-commerce';
-	if (s.includes('تابي') || s.includes('tabby')) return 'Tabby- Legend Sleep E-commerce';
-	if (s.includes('ئتمان') || s.includes('credit')) return 'Credit Card- Legend Sleep E-commerce';
-	if (s.includes('تمارا') || s.includes('tamara')) return 'Tamara- Legend Sleep E-commerce';
-	if (s.includes('إمكان') || s.includes('امكان') || s.includes('emkan')) return 'Emkan- Legend Sleep E-commerce';
-	if (s.includes('apple') || s.includes('applepay')) return 'Mada/Span- Legend Sleep E-commerce';
-	return p ? String(p) : '';
+	const prefix = paymentPrefix(p);
+	return prefix ? `${prefix}- Legend Sleep E-commerce` : '';
 }
 
 function mapWarehouse(city) {
 	const s = String(city ?? '').trim().toLowerCase();
 	if (s.includes('riyadh') || s.includes('الرياض')) return 'Riyadh Branch - Warehouse';
 	if (s.includes('dammam') || s.includes('الدمام')) return 'Dammam Warehouse';
-	return 'Bedding Factory-Warehouse';
+	return 'BEDDING FACTORY-WAREHOUSE';
 }
 
 function isInvalidSku(sku) {
@@ -102,8 +117,7 @@ const rows = $input.all().map((i) => i.json);
 
 if (rows.length > 0 && !hasCol(rows[0], COLS.skus)) {
 	throw new Error(
-		'Could not find the "skus_json" column in the uploaded file. ' +
-			'Available columns: ' + Object.keys(rows[0]).join(' | '),
+		'Could not find the "skus_json" column. Available columns: ' + Object.keys(rows[0]).join(' | '),
 	);
 }
 
@@ -112,7 +126,7 @@ const customers = [];
 const orderRows = [];
 
 for (const row of rows) {
-	const orderRef = pick(row, COLS.orderRef) ?? '';
+	const orderRef = pick(row, COLS.orderRef) ?? null;
 	const rawName = String(pick(row, COLS.name) ?? '').trim();
 	const custName = `${rawName}${seriesNumber}`;
 	const mobile = pick(row, COLS.mobile) ?? '';
@@ -123,7 +137,6 @@ for (const row of rows) {
 	const shipping = num(pick(row, COLS.shipping));
 	let items = parseSkus(pick(row, COLS.skus));
 
-	// Customer Data: one row per order
 	customers.push({
 		'Complete Name': custName,
 		Mobile: mobile,
@@ -133,7 +146,6 @@ for (const row of rows) {
 		'Is a Company': IS_A_COMPANY,
 	});
 
-	// No parseable SKUs -> still emit one flagged row so the order is visible
 	if (items.length === 0) items = [['', 1, '', 0, 0]];
 
 	const firstIdx = orderRows.length;
@@ -141,23 +153,22 @@ for (const row of rows) {
 	let first = true;
 
 	for (const item of items) {
-		const productName = String(item[0] ?? '').trim();
-		const qty = num(item[1]) || 1;
-		const sku = item[2];
-		const finalPrice = num(item[4]);
-		const unitPrice = DIVIDE_PRICE_BY_QTY && qty ? finalPrice / qty : finalPrice;
+		const qty = num(item[I_QTY]) || 1;
+		const sku = item[I_SKU];
+		const finalPrice = num(item[I_FINAL]);
+		const unitPrice = round2(DIVIDE_PRICE_BY_QTY && qty ? finalPrice / qty : finalPrice);
 		const invalid = isInvalidSku(sku);
 		if (invalid) orderHasInvalidSku = true;
 
 		orderRows.push({
-			orderRef: first ? orderRef : '',
-			product: invalid ? 'NO SKU' : productName,
+			orderRef: first ? orderRef : null,
+			product: invalid ? 'NO SKU' : String(sku),
 			unitPrice,
 			qty,
-			customer: first ? custName : '',
-			salesperson: first ? SALESPERSON : '',
-			paymentTerms: first ? paymentTerm : '',
-			warehouse: first ? warehouse : '',
+			customer: first ? custName : null,
+			salesperson: first ? SALESPERSON : null,
+			paymentTerms: first ? paymentTerm : null,
+			warehouse: first ? warehouse : null,
 			analytic: ANALYTIC,
 			productRed: invalid,
 			orderRefRed: false,
@@ -165,20 +176,18 @@ for (const row of rows) {
 		first = false;
 	}
 
-	// Order Reference cell turns red if any SKU in the order is invalid
 	if (orderHasInvalidSku) orderRows[firstIdx].orderRefRed = true;
 
-	// Shipping line (additional row -> ref/customer/etc. blank)
 	if (shipping > 0) {
 		orderRows.push({
-			orderRef: '',
+			orderRef: null,
 			product: 'Delivery_007',
-			unitPrice: shipping,
+			unitPrice: round2(shipping),
 			qty: 1,
-			customer: '',
-			salesperson: '',
-			paymentTerms: '',
-			warehouse: '',
+			customer: null,
+			salesperson: null,
+			paymentTerms: null,
+			warehouse: null,
 			analytic: ANALYTIC,
 			productRed: false,
 			orderRefRed: false,
@@ -187,10 +196,6 @@ for (const row of rows) {
 }
 
 // ── BUILD STYLED WORKBOOK ────────────────────────────────────────────────────
-const BLUE = 'FF1F4E78';
-const RED = 'FFFF0000';
-const WHITE = 'FFFFFFFF';
-
 function styleHeader(rowObj, count) {
 	for (let i = 1; i <= count; i++) {
 		const cell = rowObj.getCell(i);
@@ -244,9 +249,8 @@ for (const r of orderRows) {
 	if (r.productRed) redCell(added.getCell(2));
 }
 
-// Column widths
-ws1.columns.forEach((col) => (col.width = 22));
-ws2.columns.forEach((col) => (col.width = 22));
+ws1.columns.forEach((col) => (col.width = 24));
+ws2.columns.forEach((col) => (col.width = 24));
 
 // ── OUTPUT ───────────────────────────────────────────────────────────────────
 const fileName = `${reportDate || 'salla'} salla-odoo.xlsx`;

@@ -112,8 +112,54 @@ function parseSkus(val) {
 	}
 }
 
-// ── READ INPUT ───────────────────────────────────────────────────────────────
-const rows = $input.all().map((i) => i.json);
+// ── READ THE UPLOADED FILE DIRECTLY ──────────────────────────────────────────
+// The Form Trigger attaches the uploaded spreadsheet as a binary field whose
+// name varies by n8n version (e.g. "Orders_File"). Auto-detect it and parse the
+// first sheet into header-keyed row objects — no separate Extract node needed.
+function cellVal(v) {
+	if (v === null || v === undefined) return null;
+	if (typeof v === 'object') {
+		if (v.text !== undefined) return v.text;
+		if (v.result !== undefined) return v.result;
+		if (Array.isArray(v.richText)) return v.richText.map((t) => t.text).join('');
+		if (v.hyperlink !== undefined) return v.hyperlink;
+		return null;
+	}
+	return v;
+}
+
+const inputItems = $input.all();
+const firstBinary = inputItems.find((it) => it.binary && Object.keys(it.binary).length);
+if (!firstBinary) {
+	throw new Error('No uploaded file found on the incoming item (expected a binary field from the form).');
+}
+const binaryKey = Object.keys(firstBinary.binary)[0];
+const itemIndex = inputItems.indexOf(firstBinary);
+const inputBuffer = await this.helpers.getBinaryDataBuffer(itemIndex, binaryKey);
+
+const inWb = new ExcelJS.Workbook();
+await inWb.xlsx.load(inputBuffer);
+const sheet = inWb.worksheets[0];
+
+const headers = [];
+sheet.getRow(1).eachCell({ includeEmpty: true }, (cell, col) => {
+	headers[col] = cellVal(cell.value);
+});
+
+const rows = [];
+sheet.eachRow((row, rowNumber) => {
+	if (rowNumber === 1) return;
+	const obj = {};
+	let hasData = false;
+	row.eachCell({ includeEmpty: true }, (cell, col) => {
+		const h = headers[col];
+		if (h === null || h === undefined || h === '') return;
+		const v = cellVal(cell.value);
+		obj[h] = v;
+		if (v !== null && v !== undefined && String(v).trim() !== '') hasData = true;
+	});
+	if (hasData) rows.push(obj);
+});
 
 if (rows.length > 0 && !hasCol(rows[0], COLS.skus)) {
 	throw new Error(

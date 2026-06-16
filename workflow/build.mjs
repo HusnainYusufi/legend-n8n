@@ -17,9 +17,8 @@ const workflow = {
 				content:
 					'## Salla → Odoo import sheet\n\n' +
 					'1. **On form submission** – upload the raw Salla export, enter the **Series Number** and **Report Date**, and the email to send the result to.\n' +
-					'2. **Extract from File** – reads the rows out of the uploaded file.\n' +
-					'3. **Build Odoo File** – pure code: parses `skus_json`, maps payment terms & warehouse, appends the series number, adds shipping rows, flags missing SKUs in red, and builds the two-tab styled `.xlsx`.\n' +
-					'4. **Send Email** – emails the generated file.\n\n' +
+					'2. **Build Odoo File** – pure code: reads the uploaded file, parses `skus_json`, maps payment terms & warehouse, appends the series number, adds shipping rows, flags missing SKUs in red, and builds the two-tab styled `.xlsx`.\n' +
+					'3. **Send Email** – emails the generated file.\n\n' +
 					'⚠️ Needs the `exceljs` module (bundled in the Docker image). Edit the `COLS` map at the top of **Build Odoo File** to match your real Salla column headers.',
 				height: 360,
 				width: 440,
@@ -64,24 +63,12 @@ const workflow = {
 			position: [120, 160],
 		},
 		{
-			parameters: {
-				operation: 'xlsx',
-				binaryPropertyName: 'Orders_File',
-				options: {},
-			},
-			id: '33333333-3333-3333-3333-333333333333',
-			name: 'Extract from File',
-			type: 'n8n-nodes-base.extractFromFile',
-			typeVersion: 1.1,
-			position: [360, 160],
-		},
-		{
 			parameters: { jsCode },
 			id: '44444444-4444-4444-4444-444444444444',
 			name: 'Build Odoo File',
 			type: 'n8n-nodes-base.code',
 			typeVersion: 2,
-			position: [600, 160],
+			position: [380, 160],
 		},
 		{
 			parameters: {
@@ -99,12 +86,11 @@ const workflow = {
 			name: 'Send Email',
 			type: 'n8n-nodes-base.emailSend',
 			typeVersion: 2.1,
-			position: [840, 160],
+			position: [620, 160],
 		},
 	],
 	connections: {
-		'On form submission': { main: [[{ node: 'Extract from File', type: 'main', index: 0 }]] },
-		'Extract from File': { main: [[{ node: 'Build Odoo File', type: 'main', index: 0 }]] },
+		'On form submission': { main: [[{ node: 'Build Odoo File', type: 'main', index: 0 }]] },
 		'Build Odoo File': { main: [[{ node: 'Send Email', type: 'main', index: 0 }]] },
 	},
 };

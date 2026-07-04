@@ -43,8 +43,8 @@ services:
       - N8N_DIAGNOSTICS_ENABLED=false
       # Run Code nodes in-process so `require('exceljs')` and binary helpers work.
       - N8N_RUNNERS_ENABLED=false
-      # Allow the bundled exceljs module inside Code nodes.
-      - NODE_FUNCTION_ALLOW_EXTERNAL=exceljs
+      # Allow the bundled external modules inside Code nodes.
+      - NODE_FUNCTION_ALLOW_EXTERNAL=exceljs,pdf-lib
     volumes:
       - n8ndata:/home/node/.n8n
 

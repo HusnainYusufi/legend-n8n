@@ -1,0 +1,316 @@
+{
+  "name": "Salla Orders — Dedup PDF",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Salla orders — dedup PDF\n\n**Today branch:** On form submission → Extract today (PDF→per-page text, keeps the file).\n**History branch:** Drive list → Plan (next series + last 20) → Drive download → Extract prev (per-page text).\n**Merge** both → **Dedup & Build** removes orders already seen in the previous files (order # = 9-digit `26/27…`), rebuilds a clean PDF named `<next>.pdf` with pdf-lib.\n→ **Drive upload** (advances the series) + **Send Email** (clean PDF + report).\n\n⚠️ Needs `pdf-lib` in the image and a **Google Drive OAuth** credential on the 3 Drive nodes.",
+        "height": 340,
+        "width": 520,
+        "color": 5
+      },
+      "id": "n0",
+      "name": "Read me first",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "formTitle": "Salla Orders — Dedup",
+        "formDescription": "Upload today’s Salla order PDF. Orders already in the last 20 files are removed.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Orders PDF",
+              "fieldType": "file",
+              "multipleFiles": false,
+              "acceptFileTypes": ".pdf",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Send To Email",
+              "fieldType": "email",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n1",
+      "name": "On form submission",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        -40,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "Orders_PDF",
+        "options": {
+          "joinPages": false,
+          "keepSource": "both"
+        }
+      },
+      "id": "n2",
+      "name": "Extract today",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        -20
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "operation": "search",
+        "searchMethod": "query",
+        "queryString": "'10O-FiNRQTg-tcqEcRhZJeQ5ILh3Ro72t' in parents and trashed = false and mimeType = 'application/pdf'",
+        "returnAll": true,
+        "options": {}
+      },
+      "id": "n3",
+      "name": "Drive: list folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        220,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================================\n//  \"Plan\" Code node — decide the next series number and which files to compare.\n//  Input  = the file list from the Google Drive \"Search\" node (folder contents).\n//  Output = up to 20 items, each { fileId, fileName, series, nextSeries } for\n//           the most recent files, to be downloaded and compared against.\n// ============================================================================\n\n// How many previous files to compare against.\nconst COMPARE_COUNT = 20;\n// Fallback next-series if the Drive folder is empty (shouldn't happen normally).\nconst FALLBACK_NEXT = 1124;\n\nconst files = $input.all().map((i) => i.json);\n\n// Parse the series number out of names like \"1123.pdf\".\nconst parsed = [];\nfor (const f of files) {\n\tconst name = String(f.name ?? '');\n\tconst m = name.match(/(\\d+)\\s*\\.pdf$/i);\n\tif (m) parsed.push({ id: f.id, name, series: parseInt(m[1], 10) });\n}\n\nparsed.sort((a, b) => b.series - a.series); // newest first\n\nconst maxSeries = parsed.length ? parsed[0].series : FALLBACK_NEXT - 1;\nconst nextSeries = maxSeries + 1;\n\nconst recent = parsed.slice(0, COMPARE_COUNT);\n\nif (recent.length === 0) {\n\t// No previous files: nothing to compare, but still emit one planning item.\n\treturn [{ json: { fileId: null, fileName: null, series: null, nextSeries } }];\n}\n\nreturn recent.map((f) => ({\n\tjson: { fileId: f.id, fileName: f.name, series: f.series, nextSeries },\n}));\n"
+      },
+      "id": "n4",
+      "name": "Plan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.fileId }}"
+        },
+        "options": {}
+      },
+      "id": "n5",
+      "name": "Drive: download",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        660,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "data",
+        "options": {
+          "joinPages": false,
+          "keepSource": "json"
+        }
+      },
+      "id": "n6",
+      "name": "Extract prev",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "append"
+      },
+      "id": "n7",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1100,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================================\n//  \"Dedup & Build\" Code node — remove already-seen orders from today's PDF.\n//  Input (via Merge, append):\n//    - today's item  : has binary `Orders_PDF` + json.text[] (per-page text)\n//    - previous items: json.text[] per page (from the downloaded Drive PDFs)\n//  Page text is produced OUTSIDE the sandbox by n8n's \"Extract from File\" (PDF,\n//  Join Pages = off) — pdf-parse/pdfjs can't run inside the Code-node sandbox.\n//  Page removal uses pdf-lib's removePage(index) (a number — copyPages([...])\n//  fails because the sandbox array isn't seen as an Array by pdf-lib).\n//  Requires `pdf-lib` (bundled in the image, NODE_FUNCTION_ALLOW_EXTERNAL=...,pdf-lib).\n// ============================================================================\nconst { PDFDocument } = require('pdf-lib');\n\nconst helpers = this.helpers;\n\nconst FORM_NODE = 'On form submission';\nconst PLAN_NODE = 'Plan';\nconst EMAIL_FIELD = 'Send To Email';\nconst TODAY_BINARY = 'Orders_PDF';\n\n// Order number = 9-digit value starting 26/27 (Salla order ids). The Arabic\n// \"رقم الطلب\" label doesn't survive n8n's glyph extraction, but this numeric\n// pattern matches the order numbers exactly (verified against a full file).\nfunction ordersFromPages(pages) {\n\tconst groups = [];\n\tlet cur = null;\n\tpages.forEach((p, idx) => {\n\t\tconst m = String(p).match(/\\b(2[6789]\\d{7})\\b/);\n\t\tconst o = m ? m[1] : null;\n\t\tif (o) {\n\t\t\tcur = { order: o, pages: [idx] };\n\t\t\tgroups.push(cur);\n\t\t} else if (cur) {\n\t\t\tcur.pages.push(idx); // continuation page of the current order\n\t\t} else {\n\t\t\tcur = { order: 'UNKNOWN_' + idx, pages: [idx] };\n\t\t\tgroups.push(cur);\n\t\t}\n\t});\n\treturn groups;\n}\n\nconst items = $input.all();\n\n// today's item is the only one carrying a PDF binary\nlet todayIdx = -1;\nfor (let i = 0; i < items.length; i++) {\n\tif (items[i].binary && items[i].binary[TODAY_BINARY]) {\n\t\ttodayIdx = i;\n\t\tbreak;\n\t}\n}\nif (todayIdx === -1) throw new Error(`Could not find today's PDF (binary \"${TODAY_BINARY}\") in the input.`);\nconst todayItem = items[todayIdx];\n\n// collect order numbers seen in the previous files (aligned to the Plan list)\nconst planFiles = $(PLAN_NODE).all().map((p) => p.json.fileName);\nconst seen = new Map(); // order -> fileName it first appeared in\nlet k = 0;\nfor (let i = 0; i < items.length; i++) {\n\tif (i === todayIdx) continue;\n\tconst pages = items[i].json.text;\n\tconst fileName = planFiles[k] || items[i].json.fileName || `file_${k}`;\n\tk++;\n\tif (!Array.isArray(pages)) continue;\n\tfor (const g of ordersFromPages(pages)) {\n\t\tif (!String(g.order).startsWith('UNKNOWN_') && !seen.has(g.order)) seen.set(g.order, fileName);\n\t}\n}\n\n// today's orders → decide duplicates vs keep\nconst todayGroups = ordersFromPages(todayItem.json.text || []);\nconst duplicates = [];\nconst removePages = [];\nfor (const g of todayGroups) {\n\tif (seen.has(g.order)) {\n\t\tduplicates.push({ order: g.order, foundIn: seen.get(g.order) });\n\t\tremovePages.push(...g.pages);\n\t}\n}\n\n// rebuild the PDF without the duplicate pages (remove descending)\nconst buf = await helpers.getBinaryDataBuffer(todayIdx, TODAY_BINARY);\nconst doc = await PDFDocument.load(buf);\nremovePages\n\t.slice()\n\t.sort((a, b) => b - a)\n\t.forEach((idx) => doc.removePage(idx));\nconst bytes = await doc.save();\n\nconst nextSeries = $(PLAN_NODE).first().json.nextSeries;\nconst recipient = $(FORM_NODE).first().json[EMAIL_FIELD];\nconst fileName = `${nextSeries}.pdf`;\nconst binary = await helpers.prepareBinaryData(Buffer.from(bytes), fileName, 'application/pdf');\n\nreturn [\n\t{\n\t\tjson: {\n\t\t\tfileName,\n\t\t\tnextSeries,\n\t\t\trecipient,\n\t\t\ttotalOrdersToday: todayGroups.length,\n\t\t\tuniqueKept: todayGroups.length - duplicates.length,\n\t\t\tduplicatesRemoved: duplicates.length,\n\t\t\tcomparedAgainstFiles: items.length - 1,\n\t\t\tduplicates, // [{ order, foundIn }]\n\t\t},\n\t\tbinary: { data: binary },\n\t},\n];\n"
+      },
+      "id": "n8",
+      "name": "Dedup & Build",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "upload",
+        "inputDataFieldName": "data",
+        "name": "={{ $json.fileName }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "10O-FiNRQTg-tcqEcRhZJeQ5ILh3Ro72t"
+        },
+        "options": {}
+      },
+      "id": "n9",
+      "name": "Drive: upload",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1560,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "notifications.vmeals@gmail.com",
+        "toEmail": "={{ $json.recipient }}",
+        "subject": "=Salla dedup — {{ $json.fileName }} ({{ $json.duplicatesRemoved }} duplicates removed)",
+        "emailFormat": "html",
+        "html": "=<p>Deduplicated Salla orders — <b>{{ $json.fileName }}</b></p><p>Total orders today: {{ $json.totalOrdersToday }}<br>Unique kept: {{ $json.uniqueKept }}<br>Duplicates removed: {{ $json.duplicatesRemoved }} (compared against {{ $json.comparedAgainstFiles }} previous files)</p><p><b>Removed duplicates:</b></p><ul>{{ $json.duplicates.map(d => '<li>Order ' + d.order + ' — already in ' + d.foundIn + '</li>').join('') }}</ul>",
+        "options": {
+          "fileAttachments": "data"
+        }
+      },
+      "id": "n10",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1560,
+        220
+      ]
+    }
+  ],
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Extract today",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Drive: list folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract today": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive: list folder": {
+      "main": [
+        [
+          {
+            "node": "Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan": {
+      "main": [
+        [
+          {
+            "node": "Drive: download",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive: download": {
+      "main": [
+        [
+          {
+            "node": "Extract prev",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract prev": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Dedup & Build",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dedup & Build": {
+      "main": [
+        [
+          {
+            "node": "Drive: upload",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

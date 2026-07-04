@@ -82,3 +82,6 @@ stryker.log
 
 # Local sample data with customer PII — never commit
 /files/
+
+# Reference PDFs with customer PII — never commit
+docs/*.pdf

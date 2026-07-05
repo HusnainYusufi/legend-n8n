@@ -1,0 +1,104 @@
+{
+  "name": "Salla Dedup — Seed history (run once)",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Seed history — run ONCE\n\nUpload all your existing series PDFs (1104.pdf … 1123.pdf). They are saved to\n`/home/node/.n8n-files/salla` on the server so the daily workflow can compare against them.\nAfter this, use the **daily** workflow and never seed again.",
+        "height": 220,
+        "width": 460,
+        "color": 4
+      },
+      "id": "s0",
+      "name": "Read me first",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -220
+      ]
+    },
+    {
+      "parameters": {
+        "formTitle": "Seed Salla history",
+        "formDescription": "Upload ALL your previous order PDFs once. Filenames must be like 1123.pdf.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Previous PDFs",
+              "fieldType": "file",
+              "multipleFiles": true,
+              "acceptFileTypes": ".pdf",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "s1",
+      "name": "On form submission",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        180,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================================\n//  \"Split uploads\" Code node (Seed workflow) — turn the form's multiple\n//  uploaded PDFs into one item per file so the Write node can save each.\n//  Each output item: binary `data` = the uploaded file, json.fileName = its name.\n// ============================================================================\nconst item = $input.first();\nconst binary = item.binary || {};\n\nconst out = [];\nfor (const key of Object.keys(binary)) {\n\tconst b = binary[key];\n\tconst name = b.fileName || `${key}.pdf`;\n\tout.push({ json: { fileName: name }, binary: { data: b } });\n}\n\nif (out.length === 0) throw new Error('No files were uploaded to seed.');\nreturn out;\n"
+      },
+      "id": "s2",
+      "name": "Split uploads",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "=/home/node/.n8n-files/salla/{{ $json.fileName }}",
+        "dataPropertyName": "data",
+        "options": {}
+      },
+      "id": "s3",
+      "name": "Save to folder",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        620,
+        40
+      ]
+    }
+  ],
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Split uploads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split uploads": {
+      "main": [
+        [
+          {
+            "node": "Save to folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

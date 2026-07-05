@@ -1,0 +1,271 @@
+{
+  "name": "Salla Dedup — Daily",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Salla dedup — daily\n\nUpload today’s PDF + recipient email.\nReads the history in `/home/node/.n8n-files/salla`, removes orders already seen (order # = 9-digit `26/27…`), saves the clean PDF as `<next>.pdf` there, and emails it with a report.\n\n⚠️ Run the **Seed** workflow once first. Needs `pdf-lib` in the image.",
+        "height": 260,
+        "width": 520,
+        "color": 5
+      },
+      "id": "d0",
+      "name": "Read me first",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "formTitle": "Salla Orders — Dedup",
+        "formDescription": "Upload today’s Salla order PDF. Orders already in previous files are removed.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Orders PDF",
+              "fieldType": "file",
+              "multipleFiles": false,
+              "acceptFileTypes": ".pdf",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Send To Email",
+              "fieldType": "email",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d1",
+      "name": "On form submission",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        -60,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "Orders_PDF",
+        "options": {
+          "joinPages": false,
+          "keepSource": "both"
+        }
+      },
+      "id": "d2",
+      "name": "Extract today",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        180,
+        -20
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "/home/node/.n8n-files/salla/*.pdf",
+        "options": {}
+      },
+      "id": "d3",
+      "name": "Read folder",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        180,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================================\n//  \"Select recent\" Code node — pick the most recent history PDFs to compare.\n//  Input  = every PDF read from the server folder (binary `data`, each file's\n//           name in binary.data.fileName), from \"Read folder\".\n//  Output = the newest COMPARE_COUNT items, each carrying its binary plus\n//           json { fileName, series, nextSeries } for the next steps.\n// ============================================================================\nconst COMPARE_COUNT = 20;\nconst FALLBACK_NEXT = 1124;\n\nconst items = $input.all();\n\nconst parsed = [];\nfor (const it of items) {\n\tconst name = (it.binary && it.binary.data && it.binary.data.fileName) || it.json.fileName || '';\n\tconst m = String(name).match(/(\\d+)\\s*\\.pdf$/i);\n\tif (m) parsed.push({ it, name, series: parseInt(m[1], 10) });\n}\n\nparsed.sort((a, b) => b.series - a.series); // newest first\n\nconst maxSeries = parsed.length ? parsed[0].series : FALLBACK_NEXT - 1;\nconst nextSeries = maxSeries + 1;\n\nreturn parsed.slice(0, COMPARE_COUNT).map((x) => ({\n\tjson: { fileName: x.name, series: x.series, nextSeries },\n\tbinary: x.it.binary,\n}));\n"
+      },
+      "id": "d4",
+      "name": "Select recent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "data",
+        "options": {
+          "joinPages": false,
+          "keepSource": "json"
+        }
+      },
+      "id": "d5",
+      "name": "Extract prev",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        620,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "append"
+      },
+      "id": "d6",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        840,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================================\n//  \"Dedup & Build\" Code node (server-storage version).\n//  Input (via Merge, append):\n//    - today's item  : binary `Orders_PDF` + json.text[] (per-page text)\n//    - previous items: json.text[] + json.fileName + json.nextSeries\n//  PDF text is produced by the built-in \"Extract from File\" (PDF, Join Pages\n//  off) OUTSIDE the sandbox. Page removal uses pdf-lib removePage(index).\n//  Requires `pdf-lib` (NODE_FUNCTION_ALLOW_EXTERNAL=...,pdf-lib).\n// ============================================================================\nconst { PDFDocument } = require('pdf-lib');\n\nconst helpers = this.helpers;\n\nconst FORM_NODE = 'On form submission';\nconst EMAIL_FIELD = 'Send To Email';\nconst TODAY_BINARY = 'Orders_PDF';\n\nfunction ordersFromPages(pages) {\n\tconst groups = [];\n\tlet cur = null;\n\tpages.forEach((p, idx) => {\n\t\tconst m = String(p).match(/\\b(2[6789]\\d{7})\\b/);\n\t\tconst o = m ? m[1] : null;\n\t\tif (o) {\n\t\t\tcur = { order: o, pages: [idx] };\n\t\t\tgroups.push(cur);\n\t\t} else if (cur) {\n\t\t\tcur.pages.push(idx);\n\t\t} else {\n\t\t\tcur = { order: 'UNKNOWN_' + idx, pages: [idx] };\n\t\t\tgroups.push(cur);\n\t\t}\n\t});\n\treturn groups;\n}\n\nconst items = $input.all();\n\n// today's item = the only one carrying a PDF binary\nlet todayIdx = -1;\nfor (let i = 0; i < items.length; i++) {\n\tif (items[i].binary && items[i].binary[TODAY_BINARY]) {\n\t\ttodayIdx = i;\n\t\tbreak;\n\t}\n}\nif (todayIdx === -1) throw new Error(`Could not find today's PDF (binary \"${TODAY_BINARY}\") in the input.`);\nconst todayItem = items[todayIdx];\n\n// collect orders already seen in the previous files\nconst seen = new Map(); // order -> fileName\nlet nextSeries = null;\nfor (let i = 0; i < items.length; i++) {\n\tif (i === todayIdx) continue;\n\tconst j = items[i].json || {};\n\tif (nextSeries === null && j.nextSeries) nextSeries = j.nextSeries;\n\tconst pages = j.text;\n\tconst fileName = j.fileName || `file_${i}`;\n\tif (!Array.isArray(pages)) continue;\n\tfor (const g of ordersFromPages(pages)) {\n\t\tif (!String(g.order).startsWith('UNKNOWN_') && !seen.has(g.order)) seen.set(g.order, fileName);\n\t}\n}\nif (!nextSeries) nextSeries = 1124; // fallback if no previous files\n\n// today's orders → duplicates vs keep\nconst todayGroups = ordersFromPages(todayItem.json.text || []);\nconst duplicates = [];\nconst removePages = [];\nfor (const g of todayGroups) {\n\tif (seen.has(g.order)) {\n\t\tduplicates.push({ order: g.order, foundIn: seen.get(g.order) });\n\t\tremovePages.push(...g.pages);\n\t}\n}\n\n// rebuild without duplicate pages\nconst buf = await helpers.getBinaryDataBuffer(todayIdx, TODAY_BINARY);\nconst doc = await PDFDocument.load(buf);\nremovePages\n\t.slice()\n\t.sort((a, b) => b - a)\n\t.forEach((idx) => doc.removePage(idx));\nconst bytes = await doc.save();\n\nconst recipient = $(FORM_NODE).first().json[EMAIL_FIELD];\nconst fileName = `${nextSeries}.pdf`;\nconst binary = await helpers.prepareBinaryData(Buffer.from(bytes), fileName, 'application/pdf');\n\nreturn [\n\t{\n\t\tjson: {\n\t\t\tfileName,\n\t\t\tnextSeries,\n\t\t\trecipient,\n\t\t\ttotalOrdersToday: todayGroups.length,\n\t\t\tuniqueKept: todayGroups.length - duplicates.length,\n\t\t\tduplicatesRemoved: duplicates.length,\n\t\t\tcomparedAgainstFiles: items.length - 1,\n\t\t\tduplicates,\n\t\t},\n\t\tbinary: { data: binary },\n\t},\n];\n"
+      },
+      "id": "d7",
+      "name": "Dedup & Build",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1060,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "=/home/node/.n8n-files/salla/{{ $json.fileName }}",
+        "dataPropertyName": "data",
+        "options": {}
+      },
+      "id": "d8",
+      "name": "Save deduped",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        1300,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "notifications.vmeals@gmail.com",
+        "toEmail": "={{ $json.recipient }}",
+        "subject": "=Salla dedup — {{ $json.fileName }} ({{ $json.duplicatesRemoved }} duplicates removed)",
+        "emailFormat": "html",
+        "html": "=<p>Deduplicated Salla orders — <b>{{ $json.fileName }}</b></p><p>Total orders today: {{ $json.totalOrdersToday }}<br>Unique kept: {{ $json.uniqueKept }}<br>Duplicates removed: {{ $json.duplicatesRemoved }} (compared against {{ $json.comparedAgainstFiles }} previous files)</p><p><b>Removed duplicates:</b></p><ul>{{ $json.duplicates.map(d => '<li>Order ' + d.order + ' — already in ' + d.foundIn + '</li>').join('') }}</ul>",
+        "options": {
+          "fileAttachments": "data"
+        }
+      },
+      "id": "d9",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1300,
+        220
+      ]
+    }
+  ],
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Extract today",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract today": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read folder": {
+      "main": [
+        [
+          {
+            "node": "Select recent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select recent": {
+      "main": [
+        [
+          {
+            "node": "Extract prev",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract prev": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Dedup & Build",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dedup & Build": {
+      "main": [
+        [
+          {
+            "node": "Save deduped",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

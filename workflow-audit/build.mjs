@@ -1,15 +1,12 @@
-// Generates ../price-audit-workflow.json from parse-validate.js + build-pdf.js.
+// Generates ../price-audit-workflow.json from fetch-validate.js + build-pdf.js.
 // Run:  node workflow-audit/build.mjs
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const parseCode = readFileSync(join(here, 'parse-validate.js'), 'utf8');
+const fetchCode = readFileSync(join(here, 'fetch-validate.js'), 'utf8');
 const pdfCode = readFileSync(join(here, 'build-pdf.js'), 'utf8');
-
-// Salla store id for legendsleepsa.com (from the storefront twilight::init data).
-const STORE_ID = '2053013347';
 
 const workflow = {
 	name: 'Legend Sleep — Discount Price Audit',
@@ -21,13 +18,11 @@ const workflow = {
 				content:
 					'## Discount price audit\n\n' +
 					'1. **On form submission** – enter the recipient email.\n' +
-					'2. **Fetch products** – pulls every visible product from the Salla storefront API (cursor-paginated, `store-identifier` header — no auth token).\n' +
-					'3. **Parse & Validate** – reads regular price, price, and shown discount % (`promotion_title`); flags products where price ≠ regular×(1−shown%).\n' +
-					'4. **Fetch thumbnails** – small product images for the report.\n' +
-					'5. **Build PDF** – report of mismatches (image, prices, what the price *should* be).\n' +
-					'6. **Send Email** – emails the PDF.\n\n' +
-					'⚠️ Needs `pdf-lib` in the image. Adjust `TOLERANCE_SAR` in **Parse & Validate**. This audits customer-visible products; hidden/draft products need the Salla admin API (token).',
-				height: 400,
+					'2. **Fetch & Validate** – pure code: loops the Salla storefront API (all visible products, `store-identifier` header, cursor pagination) and flags products where price ≠ regular×(1−shown %). Uses `this.helpers.httpRequest`.\n' +
+					'3. **Build PDF** – fetches a thumbnail for each mismatch and builds the report (image, prices, what the price *should* be).\n' +
+					'4. **Send Email** – emails the PDF.\n\n' +
+					'⚠️ Needs `pdf-lib` in the image. Change `TOLERANCE_SAR`/`STORE_ID` in **Fetch & Validate**. Audits customer-visible products; hidden/draft need the Salla admin API.',
+				height: 340,
 				width: 480,
 				color: 6,
 			},
@@ -35,7 +30,7 @@ const workflow = {
 			name: 'Read me first',
 			type: 'n8n-nodes-base.stickyNote',
 			typeVersion: 1,
-			position: [-40, -300],
+			position: [-40, -240],
 		},
 		{
 			parameters: {
@@ -53,59 +48,20 @@ const workflow = {
 			position: [-40, 120],
 		},
 		{
-			parameters: {
-				url: 'https://api.salla.dev/store/v1/products?per_page=50',
-				sendHeaders: true,
-				headerParameters: { parameters: [{ name: 'store-identifier', value: STORE_ID }] },
-				options: {
-					response: { response: { responseFormat: 'json' } },
-					pagination: {
-						pagination: {
-							paginationMode: 'responseContainsNextURL',
-							// return '' (not null) at the end so pagination STOPS instead of erroring
-							nextURL: "={{ $response.body.cursor && $response.body.cursor.next ? $response.body.cursor.next : '' }}",
-							limitPagesFetched: false,
-						},
-					},
-				},
-			},
+			parameters: { jsCode: fetchCode },
 			id: 'a2',
-			name: 'Fetch products',
-			type: 'n8n-nodes-base.httpRequest',
-			typeVersion: 4.4,
-			position: [200, 120],
-			onError: 'continueRegularOutput',
-		},
-		{
-			parameters: { jsCode: parseCode },
-			id: 'a3',
-			name: 'Parse & Validate',
+			name: 'Fetch & Validate',
 			type: 'n8n-nodes-base.code',
 			typeVersion: 2,
-			position: [420, 120],
-		},
-		{
-			parameters: {
-				url: '={{ $json.thumbUrl }}',
-				options: {
-					response: { response: { responseFormat: 'file', outputPropertyName: 'data' } },
-					batching: { batch: { batchSize: 10, batchInterval: 100 } },
-				},
-			},
-			id: 'a4',
-			name: 'Fetch thumbnails',
-			type: 'n8n-nodes-base.httpRequest',
-			typeVersion: 4.4,
-			position: [640, 120],
-			onError: 'continueRegularOutput',
+			position: [200, 120],
 		},
 		{
 			parameters: { jsCode: pdfCode },
-			id: 'a5',
+			id: 'a3',
 			name: 'Build PDF',
 			type: 'n8n-nodes-base.code',
 			typeVersion: 2,
-			position: [860, 120],
+			position: [440, 120],
 		},
 		{
 			parameters: {
@@ -115,22 +71,21 @@ const workflow = {
 				emailFormat: 'html',
 				html:
 					'=<p>Attached is the discount audit for legendsleepsa.com.</p>' +
-					'<p><b>Products with a price / discount-% mismatch: {{ $json.mismatches }}</b></p>' +
+					'<p><b>Products with a price / discount-% mismatch: {{ $json.mismatches }}</b>' +
+					' (of {{ $json.onSale }} on-sale / {{ $json.totalProducts }} products)</p>' +
 					'<p>Each listed product’s price does not equal regular × (1 − shown %). The PDF shows what each price should be.</p>',
 				options: { fileAttachments: 'data' },
 			},
-			id: 'a6',
+			id: 'a4',
 			name: 'Send Email',
 			type: 'n8n-nodes-base.emailSend',
 			typeVersion: 2.1,
-			position: [1080, 120],
+			position: [680, 120],
 		},
 	],
 	connections: {
-		'On form submission': { main: [[{ node: 'Fetch products', type: 'main', index: 0 }]] },
-		'Fetch products': { main: [[{ node: 'Parse & Validate', type: 'main', index: 0 }]] },
-		'Parse & Validate': { main: [[{ node: 'Fetch thumbnails', type: 'main', index: 0 }]] },
-		'Fetch thumbnails': { main: [[{ node: 'Build PDF', type: 'main', index: 0 }]] },
+		'On form submission': { main: [[{ node: 'Fetch & Validate', type: 'main', index: 0 }]] },
+		'Fetch & Validate': { main: [[{ node: 'Build PDF', type: 'main', index: 0 }]] },
 		'Build PDF': { main: [[{ node: 'Send Email', type: 'main', index: 0 }]] },
 	},
 };

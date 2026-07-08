@@ -1,15 +1,17 @@
 // ============================================================================
 //  "Build PDF" Code node — render the mismatch report as a PDF with thumbnails.
-//  Fields come from "Parse & Validate"; the thumbnails come from this node's
-//  input (the "Fetch thumbnails" HTTP node, binary `data`), aligned by index.
-//  Requires `pdf-lib`. Uses only Latin/number text (pdf-lib can't shape Arabic),
-//  so products are identified by their code + image + link.
+//  Input  = mismatch items from "Fetch & Validate" (json, incl. thumbUrl).
+//  Fetches each thumbnail itself via httpRequest, embeds it, and builds a
+//  paginated report. Requires `pdf-lib`. Latin/number text only (pdf-lib can't
+//  shape Arabic) — products are identified by code + image + link.
 // ============================================================================
 const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
 const helpers = this.helpers;
 
-const rows = $('Parse & Validate').all().map((i) => i.json);
-const thumbCount = $input.all().length;
+const all = $input.all().map((i) => i.json);
+const rows = all.filter((r) => !r._summary && r.code !== undefined);
+const totalProducts = all[0] && (all[0]._totalProducts || all[0].totalProducts);
+const onSale = all[0] && (all[0]._onSale || all[0].onSale);
 
 const doc = await PDFDocument.create();
 const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -27,29 +29,35 @@ function text(s, x, yy, size, f, color) {
 }
 newPage();
 
-// header
 text('Legend Sleep - Discount Audit', M, y, 18, bold, rgb(0.12, 0.12, 0.42));
 y -= 22;
-text(`Products with a price / discount-% mismatch: ${rows.length}`, M, y, 11, font);
+text(
+	`Mismatches: ${rows.length}` +
+		(onSale ? `   (of ${onSale} on-sale / ${totalProducts} products)` : ''),
+	M,
+	y,
+	11,
+	font,
+);
 y -= 10;
 page.drawRectangle({ x: M, y, width: W - 2 * M, height: 1, color: rgb(0.6, 0.6, 0.6) });
 y -= 18;
 
-for (let i = 0; i < rows.length; i++) {
-	const r = rows[i];
+for (const r of rows) {
 	if (y < M + ROW) newPage();
 
-	// thumbnail (aligned by index; skip if fetch failed or format unknown)
-	if (i < thumbCount) {
+	// fetch + embed the thumbnail
+	if (r.thumbUrl) {
 		try {
-			const buf = await helpers.getBinaryDataBuffer(i, 'data');
-			if (buf && buf.length > 100) {
+			const raw = await helpers.httpRequest({ method: 'GET', url: r.thumbUrl, encoding: 'arraybuffer' });
+			const buf = Buffer.from(raw);
+			if (buf.length > 100) {
 				const isJpg = buf[0] === 0xff && buf[1] === 0xd8;
 				const img = isJpg ? await doc.embedJpg(buf) : await doc.embedPng(buf);
 				page.drawImage(img, { x: M, y: y - 58, width: 58, height: 58 });
 			}
 		} catch (e) {
-			/* no image for this row */
+			/* skip image */
 		}
 	}
 
@@ -82,4 +90,4 @@ try {
 	/* scheduled run without a form */
 }
 
-return [{ json: { mismatches: rows.length, fileName, recipient }, binary: { data: bin } }];
+return [{ json: { mismatches: rows.length, totalProducts, onSale, fileName, recipient }, binary: { data: bin } }];

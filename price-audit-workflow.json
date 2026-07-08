@@ -7,8 +7,8 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Discount price audit\n\n1. **On form submission** – enter the recipient email.\n2. **Get sitemap** → **Extract product URLs** – every product on the store (from the sitemap).\n3. **Fetch products** – downloads each product page (batched).\n4. **Parse & Validate** – reads original price, current price, shown discount %; flags products whose price ≠ original×(1−shown%).\n5. **Fetch thumbnails** – small product images for the report.\n6. **Build PDF** – report of mismatches (image, prices, what the price *should* be).\n7. **Send Email** – emails the PDF.\n\n⚠️ Needs `pdf-lib` in the image. Adjust `TOLERANCE_SAR` in **Parse & Validate** to change what counts as a mismatch.",
-        "height": 380,
+        "content": "## Discount price audit\n\n1. **On form submission** – enter the recipient email.\n2. **Fetch products** – pulls every visible product from the Salla storefront API (cursor-paginated, `store-identifier` header — no auth token).\n3. **Parse & Validate** – reads regular price, price, and shown discount % (`promotion_title`); flags products where price ≠ regular×(1−shown%).\n4. **Fetch thumbnails** – small product images for the report.\n5. **Build PDF** – report of mismatches (image, prices, what the price *should* be).\n6. **Send Email** – emails the PDF.\n\n⚠️ Needs `pdf-lib` in the image. Adjust `TOLERANCE_SAR` in **Parse & Validate**. This audits customer-visible products; hidden/draft products need the Salla admin API (token).",
+        "height": 400,
         "width": 480,
         "color": 6
       },
@@ -18,7 +18,7 @@
       "typeVersion": 1,
       "position": [
         -40,
-        -280
+        -300
       ]
     },
     {
@@ -47,74 +47,51 @@
     },
     {
       "parameters": {
-        "url": "https://legendsleepsa.com/ar/sitemap-2.xml",
+        "url": "https://api.salla.dev/store/v1/products?per_page=50",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "store-identifier",
+              "value": "2053013347"
+            }
+          ]
+        },
         "options": {
           "response": {
             "response": {
-              "responseFormat": "text"
+              "responseFormat": "json"
+            }
+          },
+          "pagination": {
+            "pagination": {
+              "paginationMode": "responseContainsNextURL",
+              "nextURL": "={{ $response.body.cursor.next }}",
+              "limitPagesFetched": false
             }
           }
         }
       },
       "id": "a2",
-      "name": "Get sitemap",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        180,
-        120
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "// ============================================================================\n//  \"Extract product URLs\" Code node — parse the product sitemap and output one\n//  item per product URL. Products are the /ar/<shortcode> pages.\n//  Input = the sitemap XML (from \"Get sitemap\", json.data).\n// ============================================================================\nconst items = $input.all();\nconst xml = String(items[0].json.data ?? items[0].json.body ?? '');\n\nconst urls = [...xml.matchAll(/<loc>([^<]+)<\\/loc>/g)]\n\t.map((m) => m[1].trim())\n\t// product short-code pages look like https://legendsleepsa.com/ar/jZxrezB\n\t.filter((u) => /\\/ar\\/[A-Za-z0-9]{5,}\\/?$/.test(u));\n\nreturn urls.map((u) => ({ json: { url: u } }));\n"
-      },
-      "id": "a3",
-      "name": "Extract product URLs",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        400,
-        120
-      ]
-    },
-    {
-      "parameters": {
-        "url": "={{ $json.url }}",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "text"
-            }
-          },
-          "batching": {
-            "batch": {
-              "batchSize": 10,
-              "batchInterval": 200
-            }
-          }
-        }
-      },
-      "id": "a4",
       "name": "Fetch products",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        620,
+        200,
         120
       ],
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "jsCode": "// ============================================================================\n//  \"Parse & Validate\" Code node — extract price/discount from each product page\n//  and flag products whose price doesn't match the shown discount %.\n//  Input  = items from \"Fetch products\" (each json.data = product page HTML,\n//           json.url = the product URL).\n//  Output = one item per MISMATCH, with the numbers + a small thumbnail URL.\n// ============================================================================\n\n// Flag a product if its price is off from the shown-% price by at least this.\nconst TOLERANCE_SAR = 1;\n\nfunction num(s) {\n\treturn s == null ? null : parseFloat(String(s).replace(/,/g, ''));\n}\n\n// The \"Fetch products\" HTTP node replaces json with the response body, so the\n// product URL is taken from the \"Extract product URLs\" node, aligned by index.\nlet urlList = [];\ntry {\n\turlList = $('Extract product URLs').all().map((x) => x.json.url);\n} catch (e) {\n\turlList = [];\n}\n\nconst items = $input.all();\nconst out = [];\nfor (let i = 0; i < items.length; i++) {\n\tconst it = items[i];\n\tconst html = String(it.json.data ?? it.json.body ?? it.json.html ?? '');\n\tconst url = String(it.json.url ?? urlList[i] ?? '');\n\n\t// original (crossed-out) price\n\tlet m = html.match(/before-price[^>]*line-through\"[^>]*>\\s*([0-9,]+\\.?[0-9]*)/i);\n\tconst original = m ? num(m[1]) : null;\n\n\t// current (sale) price\n\tm = html.match(/sale_price:amount\"\\s+content=\"([0-9.]+)\"/i);\n\tconst current = m ? num(m[1]) : null;\n\n\t// shown discount %  (Arabic \"خصم NN%\")\n\tm = html.match(/خصم[\\s ]*([0-9]+)\\s*%/);\n\tconst shownPct = m ? parseInt(m[1], 10) : null;\n\n\t// product name (JSON-LD)\n\tm = html.match(/\"@type\":\"Product\",\"name\":\"([^\"]+)\"/);\n\tconst name = m ? m[1] : '';\n\n\t// product image (first Salla CDN image in the product JSON-LD)\n\tm = html.match(/\"image\":\"(https:\\\\?\\/\\\\?\\/cdn\\.salla\\.sa[^\"]+?\\.(?:png|jpe?g|webp))/i);\n\tconst image = m ? m[1].replace(/\\\\\\//g, '/') : null;\n\n\t// short code from the URL (…/ar/CODE)\n\tm = url.match(/\\/ar\\/([A-Za-z0-9]+)\\/?$/);\n\tconst code = m ? m[1] : '';\n\n\t// only products that are actually on sale can be audited\n\tif (!(original && current && shownPct)) continue;\n\n\tconst expected = Math.round(original * (1 - shownPct / 100) * 100) / 100;\n\tconst actualPct = Math.round((1 - current / original) * 1000) / 10;\n\tconst diff = Math.round((current - expected) * 100) / 100;\n\n\tif (Math.abs(diff) >= TOLERANCE_SAR) {\n\t\tout.push({\n\t\t\tjson: {\n\t\t\t\tcode,\n\t\t\t\turl,\n\t\t\t\tname,\n\t\t\t\toriginal,\n\t\t\t\tcurrent,\n\t\t\t\tshownPct,\n\t\t\t\texpected, // what the price SHOULD be for the shown %\n\t\t\t\tactualPct, // the real discount % the price gives\n\t\t\t\tdiff, // current - expected  (＋ = charged too much vs shown %)\n\t\t\t\timage,\n\t\t\t\tthumbUrl: image\n\t\t\t\t\t? `https://cdn.salla.sa/cdn-cgi/image/width=120,quality=70/${image}`\n\t\t\t\t\t: null,\n\t\t\t},\n\t\t});\n\t}\n}\n\nreturn out;\n"
+        "jsCode": "// ============================================================================\n//  \"Parse & Validate\" Code node — read products from the Salla storefront API\n//  and flag those whose price doesn't match the shown discount %.\n//  Input  = items from \"Fetch products\" (each json = one API page: {data:[...]}).\n//  Output = one item per MISMATCH, with the numbers + a small thumbnail URL.\n// ============================================================================\n\n// Flag a product if its price is off from the shown-% price by at least this.\nconst TOLERANCE_SAR = 1;\n\nfunction num(v) {\n\tif (v == null) return null;\n\tconst n = parseFloat(String(v).replace(/,/g, ''));\n\treturn isNaN(n) ? null : n;\n}\nfunction round2(n) {\n\treturn Math.round((n + Number.EPSILON) * 100) / 100;\n}\n\nconst out = [];\nfor (const it of $input.all()) {\n\tconst products = Array.isArray(it.json.data) ? it.json.data : [];\n\tfor (const p of products) {\n\t\tif (!p.is_on_sale) continue;\n\n\t\tconst regular = num(p.regular_price);\n\t\tconst current = num(p.price != null ? p.price : p.sale_price);\n\n\t\t// shown discount % from \"promotion_title\" e.g. \"خصم 25%\"\n\t\tconst m = String(p.promotion_title ?? '').match(/([0-9]+)\\s*%/);\n\t\tconst shownPct = m ? parseInt(m[1], 10) : null;\n\n\t\tif (!(regular && current && shownPct)) continue;\n\n\t\tconst expected = round2(regular * (1 - shownPct / 100));\n\t\tconst actualPct = Math.round((1 - current / regular) * 1000) / 10;\n\t\tconst diff = round2(current - expected);\n\n\t\tif (Math.abs(diff) >= TOLERANCE_SAR) {\n\t\t\tconst image = typeof p.image === 'string' ? p.image : p.image && p.image.url;\n\t\t\tconst url = String(p.url ?? '');\n\t\t\tconst codeM = url.match(/\\/(?:ar|en)\\/([A-Za-z0-9]+)\\/?$/);\n\t\t\tout.push({\n\t\t\t\tjson: {\n\t\t\t\t\tid: p.id,\n\t\t\t\t\tcode: codeM ? codeM[1] : '',\n\t\t\t\t\turl,\n\t\t\t\t\tname: p.name,\n\t\t\t\t\toriginal: regular,\n\t\t\t\t\tcurrent,\n\t\t\t\t\tshownPct,\n\t\t\t\t\texpected, // what the price SHOULD be for the shown %\n\t\t\t\t\tactualPct, // the real discount % the price gives\n\t\t\t\t\tdiff, // current - expected\n\t\t\t\t\timage: image || null,\n\t\t\t\t\tthumbUrl: image\n\t\t\t\t\t\t? `https://cdn.salla.sa/cdn-cgi/image/width=120,quality=70/${image}`\n\t\t\t\t\t\t: null,\n\t\t\t\t},\n\t\t\t});\n\t\t}\n\t}\n}\n\nreturn out;\n"
       },
-      "id": "a5",
+      "id": "a3",
       "name": "Parse & Validate",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        840,
+        420,
         120
       ]
     },
@@ -136,12 +113,12 @@
           }
         }
       },
-      "id": "a6",
+      "id": "a4",
       "name": "Fetch thumbnails",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        1060,
+        640,
         120
       ],
       "onError": "continueRegularOutput"
@@ -150,12 +127,12 @@
       "parameters": {
         "jsCode": "// ============================================================================\r\n//  \"Build PDF\" Code node — render the mismatch report as a PDF with thumbnails.\r\n//  Fields come from \"Parse & Validate\"; the thumbnails come from this node's\r\n//  input (the \"Fetch thumbnails\" HTTP node, binary `data`), aligned by index.\r\n//  Requires `pdf-lib`. Uses only Latin/number text (pdf-lib can't shape Arabic),\r\n//  so products are identified by their code + image + link.\r\n// ============================================================================\r\nconst { PDFDocument, StandardFonts, rgb } = require('pdf-lib');\r\nconst helpers = this.helpers;\r\n\r\nconst rows = $('Parse & Validate').all().map((i) => i.json);\r\nconst thumbCount = $input.all().length;\r\n\r\nconst doc = await PDFDocument.create();\r\nconst font = await doc.embedFont(StandardFonts.Helvetica);\r\nconst bold = await doc.embedFont(StandardFonts.HelveticaBold);\r\n\r\nconst W = 595, H = 842, M = 40, ROW = 78;\r\nlet page, y;\r\nfunction newPage() {\r\n\tpage = doc.addPage();\r\n\tpage.setSize(W, H);\r\n\ty = H - M;\r\n}\r\nfunction text(s, x, yy, size, f, color) {\r\n\tpage.drawText(String(s), { x, y: yy, size, font: f || font, color: color || rgb(0, 0, 0) });\r\n}\r\nnewPage();\r\n\r\n// header\r\ntext('Legend Sleep - Discount Audit', M, y, 18, bold, rgb(0.12, 0.12, 0.42));\r\ny -= 22;\r\ntext(`Products with a price / discount-% mismatch: ${rows.length}`, M, y, 11, font);\r\ny -= 10;\r\npage.drawRectangle({ x: M, y, width: W - 2 * M, height: 1, color: rgb(0.6, 0.6, 0.6) });\r\ny -= 18;\r\n\r\nfor (let i = 0; i < rows.length; i++) {\r\n\tconst r = rows[i];\r\n\tif (y < M + ROW) newPage();\r\n\r\n\t// thumbnail (aligned by index; skip if fetch failed or format unknown)\r\n\tif (i < thumbCount) {\r\n\t\ttry {\r\n\t\t\tconst buf = await helpers.getBinaryDataBuffer(i, 'data');\r\n\t\t\tif (buf && buf.length > 100) {\r\n\t\t\t\tconst isJpg = buf[0] === 0xff && buf[1] === 0xd8;\r\n\t\t\t\tconst img = isJpg ? await doc.embedJpg(buf) : await doc.embedPng(buf);\r\n\t\t\t\tpage.drawImage(img, { x: M, y: y - 58, width: 58, height: 58 });\r\n\t\t\t}\r\n\t\t} catch (e) {\r\n\t\t\t/* no image for this row */\r\n\t\t}\r\n\t}\r\n\r\n\tconst tx = M + 72;\r\n\tconst sign = r.diff > 0 ? '+' : '';\r\n\ttext(r.code, tx, y - 8, 12, bold);\r\n\ttext(`Original ${r.original}   Current ${r.current}   Shown ${r.shownPct}%`, tx, y - 24, 10, font);\r\n\ttext(\r\n\t\t`Should be ${r.expected}   Real ${r.actualPct}%   Off by ${sign}${r.diff} SAR`,\r\n\t\ttx,\r\n\t\ty - 39,\r\n\t\t10,\r\n\t\tbold,\r\n\t\trgb(0.8, 0, 0),\r\n\t);\r\n\ttext(r.url, tx, y - 54, 8, font, rgb(0.3, 0.3, 0.7));\r\n\r\n\ty -= ROW;\r\n\tpage.drawRectangle({ x: M, y: y + 8, width: W - 2 * M, height: 0.5, color: rgb(0.85, 0.85, 0.85) });\r\n}\r\n\r\nconst fileName = 'discount-audit.pdf';\r\nconst bytes = await doc.save();\r\nconst bin = await helpers.prepareBinaryData(Buffer.from(bytes), fileName, 'application/pdf');\r\n\r\nlet recipient = '';\r\ntry {\r\n\trecipient = $('On form submission').first().json['Send To Email'];\r\n} catch (e) {\r\n\t/* scheduled run without a form */\r\n}\r\n\r\nreturn [{ json: { mismatches: rows.length, fileName, recipient }, binary: { data: bin } }];\r\n"
       },
-      "id": "a7",
+      "id": "a5",
       "name": "Build PDF",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1280,
+        860,
         120
       ]
     },
@@ -165,45 +142,23 @@
         "toEmail": "={{ $json.recipient }}",
         "subject": "=Legend Sleep discount audit — {{ $json.mismatches }} mismatches",
         "emailFormat": "html",
-        "html": "=<p>Attached is the discount audit for legendsleepsa.com.</p><p><b>Products with a price / discount-% mismatch: {{ $json.mismatches }}</b></p><p>Each listed product’s price does not equal original × (1 − shown %). The PDF shows what each price should be.</p>",
+        "html": "=<p>Attached is the discount audit for legendsleepsa.com.</p><p><b>Products with a price / discount-% mismatch: {{ $json.mismatches }}</b></p><p>Each listed product’s price does not equal regular × (1 − shown %). The PDF shows what each price should be.</p>",
         "options": {
           "fileAttachments": "data"
         }
       },
-      "id": "a8",
+      "id": "a6",
       "name": "Send Email",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
       "position": [
-        1500,
+        1080,
         120
       ]
     }
   ],
   "connections": {
     "On form submission": {
-      "main": [
-        [
-          {
-            "node": "Get sitemap",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get sitemap": {
-      "main": [
-        [
-          {
-            "node": "Extract product URLs",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Extract product URLs": {
       "main": [
         [
           {

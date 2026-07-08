@@ -1,15 +1,15 @@
-// Generates ../price-audit-workflow.json from the three code files.
+// Generates ../price-audit-workflow.json from parse-validate.js + build-pdf.js.
 // Run:  node workflow-audit/build.mjs
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const extractCode = readFileSync(join(here, 'extract-urls.js'), 'utf8');
 const parseCode = readFileSync(join(here, 'parse-validate.js'), 'utf8');
 const pdfCode = readFileSync(join(here, 'build-pdf.js'), 'utf8');
 
-const SITEMAP = 'https://legendsleepsa.com/ar/sitemap-2.xml';
+// Salla store id for legendsleepsa.com (from the storefront twilight::init data).
+const STORE_ID = '2053013347';
 
 const workflow = {
 	name: 'Legend Sleep — Discount Price Audit',
@@ -21,14 +21,13 @@ const workflow = {
 				content:
 					'## Discount price audit\n\n' +
 					'1. **On form submission** – enter the recipient email.\n' +
-					'2. **Get sitemap** → **Extract product URLs** – every product on the store (from the sitemap).\n' +
-					'3. **Fetch products** – downloads each product page (batched).\n' +
-					'4. **Parse & Validate** – reads original price, current price, shown discount %; flags products whose price ≠ original×(1−shown%).\n' +
-					'5. **Fetch thumbnails** – small product images for the report.\n' +
-					'6. **Build PDF** – report of mismatches (image, prices, what the price *should* be).\n' +
-					'7. **Send Email** – emails the PDF.\n\n' +
-					'⚠️ Needs `pdf-lib` in the image. Adjust `TOLERANCE_SAR` in **Parse & Validate** to change what counts as a mismatch.',
-				height: 380,
+					'2. **Fetch products** – pulls every visible product from the Salla storefront API (cursor-paginated, `store-identifier` header — no auth token).\n' +
+					'3. **Parse & Validate** – reads regular price, price, and shown discount % (`promotion_title`); flags products where price ≠ regular×(1−shown%).\n' +
+					'4. **Fetch thumbnails** – small product images for the report.\n' +
+					'5. **Build PDF** – report of mismatches (image, prices, what the price *should* be).\n' +
+					'6. **Send Email** – emails the PDF.\n\n' +
+					'⚠️ Needs `pdf-lib` in the image. Adjust `TOLERANCE_SAR` in **Parse & Validate**. This audits customer-visible products; hidden/draft products need the Salla admin API (token).',
+				height: 400,
 				width: 480,
 				color: 6,
 			},
@@ -36,7 +35,7 @@ const workflow = {
 			name: 'Read me first',
 			type: 'n8n-nodes-base.stickyNote',
 			typeVersion: 1,
-			position: [-40, -280],
+			position: [-40, -300],
 		},
 		{
 			parameters: {
@@ -55,45 +54,34 @@ const workflow = {
 		},
 		{
 			parameters: {
-				url: SITEMAP,
-				options: { response: { response: { responseFormat: 'text' } } },
-			},
-			id: 'a2',
-			name: 'Get sitemap',
-			type: 'n8n-nodes-base.httpRequest',
-			typeVersion: 4.4,
-			position: [180, 120],
-		},
-		{
-			parameters: { jsCode: extractCode },
-			id: 'a3',
-			name: 'Extract product URLs',
-			type: 'n8n-nodes-base.code',
-			typeVersion: 2,
-			position: [400, 120],
-		},
-		{
-			parameters: {
-				url: '={{ $json.url }}',
+				url: 'https://api.salla.dev/store/v1/products?per_page=50',
+				sendHeaders: true,
+				headerParameters: { parameters: [{ name: 'store-identifier', value: STORE_ID }] },
 				options: {
-					response: { response: { responseFormat: 'text' } },
-					batching: { batch: { batchSize: 10, batchInterval: 200 } },
+					response: { response: { responseFormat: 'json' } },
+					pagination: {
+						pagination: {
+							paginationMode: 'responseContainsNextURL',
+							nextURL: '={{ $response.body.cursor.next }}',
+							limitPagesFetched: false,
+						},
+					},
 				},
 			},
-			id: 'a4',
+			id: 'a2',
 			name: 'Fetch products',
 			type: 'n8n-nodes-base.httpRequest',
 			typeVersion: 4.4,
-			position: [620, 120],
+			position: [200, 120],
 			onError: 'continueRegularOutput',
 		},
 		{
 			parameters: { jsCode: parseCode },
-			id: 'a5',
+			id: 'a3',
 			name: 'Parse & Validate',
 			type: 'n8n-nodes-base.code',
 			typeVersion: 2,
-			position: [840, 120],
+			position: [420, 120],
 		},
 		{
 			parameters: {
@@ -103,20 +91,20 @@ const workflow = {
 					batching: { batch: { batchSize: 10, batchInterval: 100 } },
 				},
 			},
-			id: 'a6',
+			id: 'a4',
 			name: 'Fetch thumbnails',
 			type: 'n8n-nodes-base.httpRequest',
 			typeVersion: 4.4,
-			position: [1060, 120],
+			position: [640, 120],
 			onError: 'continueRegularOutput',
 		},
 		{
 			parameters: { jsCode: pdfCode },
-			id: 'a7',
+			id: 'a5',
 			name: 'Build PDF',
 			type: 'n8n-nodes-base.code',
 			typeVersion: 2,
-			position: [1280, 120],
+			position: [860, 120],
 		},
 		{
 			parameters: {
@@ -127,20 +115,18 @@ const workflow = {
 				html:
 					'=<p>Attached is the discount audit for legendsleepsa.com.</p>' +
 					'<p><b>Products with a price / discount-% mismatch: {{ $json.mismatches }}</b></p>' +
-					'<p>Each listed product’s price does not equal original × (1 − shown %). The PDF shows what each price should be.</p>',
+					'<p>Each listed product’s price does not equal regular × (1 − shown %). The PDF shows what each price should be.</p>',
 				options: { fileAttachments: 'data' },
 			},
-			id: 'a8',
+			id: 'a6',
 			name: 'Send Email',
 			type: 'n8n-nodes-base.emailSend',
 			typeVersion: 2.1,
-			position: [1500, 120],
+			position: [1080, 120],
 		},
 	],
 	connections: {
-		'On form submission': { main: [[{ node: 'Get sitemap', type: 'main', index: 0 }]] },
-		'Get sitemap': { main: [[{ node: 'Extract product URLs', type: 'main', index: 0 }]] },
-		'Extract product URLs': { main: [[{ node: 'Fetch products', type: 'main', index: 0 }]] },
+		'On form submission': { main: [[{ node: 'Fetch products', type: 'main', index: 0 }]] },
 		'Fetch products': { main: [[{ node: 'Parse & Validate', type: 'main', index: 0 }]] },
 		'Parse & Validate': { main: [[{ node: 'Fetch thumbnails', type: 'main', index: 0 }]] },
 		'Fetch thumbnails': { main: [[{ node: 'Build PDF', type: 'main', index: 0 }]] },

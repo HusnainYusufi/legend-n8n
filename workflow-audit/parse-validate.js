@@ -1,83 +1,64 @@
 // ============================================================================
-//  "Parse & Validate" Code node — extract price/discount from each product page
-//  and flag products whose price doesn't match the shown discount %.
-//  Input  = items from "Fetch products" (each json.data = product page HTML,
-//           json.url = the product URL).
+//  "Parse & Validate" Code node — read products from the Salla storefront API
+//  and flag those whose price doesn't match the shown discount %.
+//  Input  = items from "Fetch products" (each json = one API page: {data:[...]}).
 //  Output = one item per MISMATCH, with the numbers + a small thumbnail URL.
 // ============================================================================
 
 // Flag a product if its price is off from the shown-% price by at least this.
 const TOLERANCE_SAR = 1;
 
-function num(s) {
-	return s == null ? null : parseFloat(String(s).replace(/,/g, ''));
+function num(v) {
+	if (v == null) return null;
+	const n = parseFloat(String(v).replace(/,/g, ''));
+	return isNaN(n) ? null : n;
+}
+function round2(n) {
+	return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
-// The "Fetch products" HTTP node replaces json with the response body, so the
-// product URL is taken from the "Extract product URLs" node, aligned by index.
-let urlList = [];
-try {
-	urlList = $('Extract product URLs').all().map((x) => x.json.url);
-} catch (e) {
-	urlList = [];
-}
-
-const items = $input.all();
 const out = [];
-for (let i = 0; i < items.length; i++) {
-	const it = items[i];
-	const html = String(it.json.data ?? it.json.body ?? it.json.html ?? '');
-	const url = String(it.json.url ?? urlList[i] ?? '');
+for (const it of $input.all()) {
+	const products = Array.isArray(it.json.data) ? it.json.data : [];
+	for (const p of products) {
+		if (!p.is_on_sale) continue;
 
-	// original (crossed-out) price
-	let m = html.match(/before-price[^>]*line-through"[^>]*>\s*([0-9,]+\.?[0-9]*)/i);
-	const original = m ? num(m[1]) : null;
+		const regular = num(p.regular_price);
+		const current = num(p.price != null ? p.price : p.sale_price);
 
-	// current (sale) price
-	m = html.match(/sale_price:amount"\s+content="([0-9.]+)"/i);
-	const current = m ? num(m[1]) : null;
+		// shown discount % from "promotion_title" e.g. "خصم 25%"
+		const m = String(p.promotion_title ?? '').match(/([0-9]+)\s*%/);
+		const shownPct = m ? parseInt(m[1], 10) : null;
 
-	// shown discount %  (Arabic "خصم NN%")
-	m = html.match(/خصم[\s ]*([0-9]+)\s*%/);
-	const shownPct = m ? parseInt(m[1], 10) : null;
+		if (!(regular && current && shownPct)) continue;
 
-	// product name (JSON-LD)
-	m = html.match(/"@type":"Product","name":"([^"]+)"/);
-	const name = m ? m[1] : '';
+		const expected = round2(regular * (1 - shownPct / 100));
+		const actualPct = Math.round((1 - current / regular) * 1000) / 10;
+		const diff = round2(current - expected);
 
-	// product image (first Salla CDN image in the product JSON-LD)
-	m = html.match(/"image":"(https:\\?\/\\?\/cdn\.salla\.sa[^"]+?\.(?:png|jpe?g|webp))/i);
-	const image = m ? m[1].replace(/\\\//g, '/') : null;
-
-	// short code from the URL (…/ar/CODE)
-	m = url.match(/\/ar\/([A-Za-z0-9]+)\/?$/);
-	const code = m ? m[1] : '';
-
-	// only products that are actually on sale can be audited
-	if (!(original && current && shownPct)) continue;
-
-	const expected = Math.round(original * (1 - shownPct / 100) * 100) / 100;
-	const actualPct = Math.round((1 - current / original) * 1000) / 10;
-	const diff = Math.round((current - expected) * 100) / 100;
-
-	if (Math.abs(diff) >= TOLERANCE_SAR) {
-		out.push({
-			json: {
-				code,
-				url,
-				name,
-				original,
-				current,
-				shownPct,
-				expected, // what the price SHOULD be for the shown %
-				actualPct, // the real discount % the price gives
-				diff, // current - expected  (＋ = charged too much vs shown %)
-				image,
-				thumbUrl: image
-					? `https://cdn.salla.sa/cdn-cgi/image/width=120,quality=70/${image}`
-					: null,
-			},
-		});
+		if (Math.abs(diff) >= TOLERANCE_SAR) {
+			const image = typeof p.image === 'string' ? p.image : p.image && p.image.url;
+			const url = String(p.url ?? '');
+			const codeM = url.match(/\/(?:ar|en)\/([A-Za-z0-9]+)\/?$/);
+			out.push({
+				json: {
+					id: p.id,
+					code: codeM ? codeM[1] : '',
+					url,
+					name: p.name,
+					original: regular,
+					current,
+					shownPct,
+					expected, // what the price SHOULD be for the shown %
+					actualPct, // the real discount % the price gives
+					diff, // current - expected
+					image: image || null,
+					thumbUrl: image
+						? `https://cdn.salla.sa/cdn-cgi/image/width=120,quality=70/${image}`
+						: null,
+				},
+			});
+		}
 	}
 }
 

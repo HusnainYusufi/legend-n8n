@@ -62,7 +62,8 @@ const workflow = {
 					pagination: {
 						pagination: {
 							paginationMode: 'responseContainsNextURL',
-							nextURL: '={{ $response.body.cursor.next }}',
+							// return '' (not null) at the end so pagination STOPS instead of erroring
+							nextURL: "={{ $response.body.cursor && $response.body.cursor.next ? $response.body.cursor.next : '' }}",
 							limitPagesFetched: false,
 						},
 					},

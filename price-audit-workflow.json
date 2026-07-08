@@ -66,7 +66,7 @@
           "pagination": {
             "pagination": {
               "paginationMode": "responseContainsNextURL",
-              "nextURL": "={{ $response.body.cursor.next }}",
+              "nextURL": "={{ $response.body.cursor && $response.body.cursor.next ? $response.body.cursor.next : '' }}",
               "limitPagesFetched": false
             }
           }

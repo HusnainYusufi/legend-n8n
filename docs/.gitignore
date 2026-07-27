@@ -1,0 +1,21 @@
+# ---------------------------------------------------------------------------
+# Legend Sleep business data — DO NOT COMMIT.
+#
+# This repository is PUBLIC (github.com/HusnainYusufi/legend-n8n). The files
+# below contain the full pricing structure, revenue forecast, ad budgets,
+# platform campaign IDs and staff names. Committing them publishes all of it
+# permanently — git history keeps it even after a later delete, and GitHub
+# content is mirrored and indexed.
+#
+# Keep them local. The workflow reads the workbook as an upload at runtime, so
+# nothing here needs to be in the repo for it to work.
+# ---------------------------------------------------------------------------
+
+# The workbook itself
+*.xlsx
+
+# Full financial decode: revenue, budgets, campaign IDs, staff names
+sales-forecast-workbook.md
+
+# 726 SKUs with list and promo prices — full pricing and margin structure
+sku-catalog.csv

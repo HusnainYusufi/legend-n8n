@@ -1,0 +1,310 @@
+{
+  "name": "Legend Sleep — Forecast Builder",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Legend Sleep — Forecast Builder",
+        "formDescription": "Enter SKUs and quantities. Get back your workbook, fully calculated.",
+        "formFields": {
+          "values": [
+            {
+              "fieldType": "html",
+              "elementName": "intro",
+              "html": "<div class=\"ls-panel\">\n<b>Builds a complete forecast workbook for you.</b> You give it SKUs and monthly\nquantities; it splits them across the five weeks using the sheet's own\n24 / 15 / 11 / 20 / 30 curve, writes them into your workbook, and returns the\nfile with every formula, summary and chart recalculated.\n<table>\n<tr><td>Step 1</td><td>Report month and default sales channel</td></tr>\n<tr><td>Step 2</td><td>SKUs and quantities</td></tr>\n<tr><td>Step 3</td><td>Marketing spend, then attach your workbook</td></tr>\n</table>\n</div>\n<div class=\"ls-panel ls-warn\">\n<b>All amounts in SAR.</b> Convert foreign currency before entering.\n<div class=\"ls-rtl\">جميع المبالغ بالريال السعودي. حوّل العملات الأجنبية قبل الإدخال.</div>\n</div>"
+            },
+            {
+              "fieldLabel": "Report Month",
+              "fieldType": "text",
+              "placeholder": "e.g. 2026-08",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Default Channel",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "ONLINE | إلكتروني"
+                  },
+                  {
+                    "option": "BRANCHES | فروع"
+                  },
+                  {
+                    "option": "Both | كلاهما"
+                  }
+                ]
+              },
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {
+          "path": "legend-sleep-forecast",
+          "customCss": "\n.form-container, .card {\n  border-radius: 14px;\n  box-shadow: 0 10px 30px rgba(15,61,94,.10);\n}\nh1, .form-header h1 { color: #0F3D5E; letter-spacing: -.01em; }\n.form-header p { color: #4a6b83; }\nbutton[type=submit], .btn-primary {\n  background: #F18F01 !important;\n  border-color: #F18F01 !important;\n  font-weight: 600;\n}\nbutton[type=submit]:hover, .btn-primary:hover {\n  background: #d87f00 !important;\n  border-color: #d87f00 !important;\n}\nlabel, .form-label { color: #0F3D5E; font-weight: 600; }\ninput, textarea, select { border-radius: 8px !important; }\ntextarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }\n.ls-panel {\n  background: #f4f8fb; border: 1px solid #d9e6ef; border-left: 4px solid #2E86AB;\n  border-radius: 10px; padding: 14px 16px; margin: 4px 0 18px; color: #234;\n  font-size: 13.5px; line-height: 1.6;\n}\n.ls-panel code {\n  background: #0F3D5E; color: #fff; padding: 2px 7px; border-radius: 5px;\n  font-family: ui-monospace, Menlo, monospace; font-size: 12.5px;\n}\n.ls-warn { border-left-color: #F18F01; background: #fff8ee; }\n.ls-panel table { width: 100%; border-collapse: collapse; margin-top: 8px; }\n.ls-panel td { padding: 5px 8px; border-top: 1px solid #e3edf4; vertical-align: top; }\n.ls-rtl { direction: rtl; text-align: right; color: #4a6b83; font-size: 13px; }\n",
+          "buttonLabel": "Next — enter SKUs"
+        }
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        -380,
+        0
+      ],
+      "id": "fd414516-09c6-4569-a630-889e1153b207",
+      "name": "Step 1 — Setup",
+      "webhookId": "da905b92-9446-4483-a82d-87b9a340615b"
+    },
+    {
+      "parameters": {
+        "operation": "page",
+        "defineForm": "fields",
+        "formFields": {
+          "values": [
+            {
+              "fieldType": "html",
+              "elementName": "skuHelp",
+              "html": "<div class=\"ls-panel\">\n<b>One SKU per line.</b> Four accepted formats — mix them freely:\n<table>\n<tr><td><code>LS-382, 400</code></td><td>400 units for the month, auto-split\n96 / 60 / 44 / 80 / 120</td></tr>\n<tr><td><code>LS-079, 96,60,44,80,120</code></td><td>exact units for W1…W5 —\nfull manual control</td></tr>\n<tr><td><code>LS-054, 400, W3=200</code></td><td>pin W3 at 200 units; the\nremaining 200 spreads over the other four weeks by the same curve</td></tr>\n<tr><td><code>LS-325, 250, BRANCHES</code></td><td>override the default channel.\n<code>Both</code> splits the quantity across both channels</td></tr>\n</table>\nLines starting with <code>#</code> are ignored. Product name, category and price\nare filled in automatically from your workbook — do not enter them.\n<div class=\"ls-rtl\">أدخل رمز المنتج والكمية فقط. يتم تعبئة الاسم والفئة والسعر تلقائياً.</div>\n</div>"
+            },
+            {
+              "fieldLabel": "Forecast Lines",
+              "fieldType": "textarea",
+              "placeholder": "LS-382, 400\nLS-079, 96,60,44,80,120\nLS-054, 400, W3=200\nLS-325, 250, Both",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {
+          "formTitle": "Step 2 — SKUs & quantities",
+          "buttonLabel": "Next — marketing spend",
+          "customCss": "\n.form-container, .card {\n  border-radius: 14px;\n  box-shadow: 0 10px 30px rgba(15,61,94,.10);\n}\nh1, .form-header h1 { color: #0F3D5E; letter-spacing: -.01em; }\n.form-header p { color: #4a6b83; }\nbutton[type=submit], .btn-primary {\n  background: #F18F01 !important;\n  border-color: #F18F01 !important;\n  font-weight: 600;\n}\nbutton[type=submit]:hover, .btn-primary:hover {\n  background: #d87f00 !important;\n  border-color: #d87f00 !important;\n}\nlabel, .form-label { color: #0F3D5E; font-weight: 600; }\ninput, textarea, select { border-radius: 8px !important; }\ntextarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }\n.ls-panel {\n  background: #f4f8fb; border: 1px solid #d9e6ef; border-left: 4px solid #2E86AB;\n  border-radius: 10px; padding: 14px 16px; margin: 4px 0 18px; color: #234;\n  font-size: 13.5px; line-height: 1.6;\n}\n.ls-panel code {\n  background: #0F3D5E; color: #fff; padding: 2px 7px; border-radius: 5px;\n  font-family: ui-monospace, Menlo, monospace; font-size: 12.5px;\n}\n.ls-warn { border-left-color: #F18F01; background: #fff8ee; }\n.ls-panel table { width: 100%; border-collapse: collapse; margin-top: 8px; }\n.ls-panel td { padding: 5px 8px; border-top: 1px solid #e3edf4; vertical-align: top; }\n.ls-rtl { direction: rtl; text-align: right; color: #4a6b83; font-size: 13px; }\n"
+        }
+      },
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        -140,
+        0
+      ],
+      "id": "3b04307b-37f9-4803-88cf-21495e26dd0c",
+      "name": "Step 2 — SKU Quantities",
+      "webhookId": "68bd79f4-f2db-4b28-bda8-ac06c27aff47"
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "sku_catalog"
+        },
+        "returnAll": true,
+        "filters": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        100,
+        0
+      ],
+      "id": "ccb3aede-f719-40ab-9c53-3a5b56c9c7ae",
+      "name": "Get SKU Catalog",
+      "onError": "continueRegularOutput",
+      "notes": "Curated SKU→category. If the table is missing or empty the workflow still runs, falling back to the workbook's own categories."
+    },
+    {
+      "parameters": {
+        "operation": "page",
+        "defineForm": "fields",
+        "formFields": {
+          "values": [
+            {
+              "fieldType": "html",
+              "elementName": "spendHelp",
+              "html": "<div class=\"ls-panel\">\n<b>Marketing spend — pick whichever is easiest.</b> Leave all of it blank to keep\nthe spend already in your workbook untouched.\n<table>\n<tr><td>Total only</td><td>split across the five weeks on the same curve</td></tr>\n<tr><td>Per week</td><td>fill W1–W5 below; these win over the total</td></tr>\n<tr><td>Detailed lines</td><td><code>Influencers, Influencer, 50000</code> —\ncategory, platform, amount. One per line; each is split across the weeks. These\nwin over everything else.</td></tr>\n</table>\n</div>\n<div class=\"ls-panel ls-warn\">\n<b>Finally, attach your current workbook below.</b> It is used as the template,\nso you get back your own file — same 11 tabs, same formulas, same charts, new\nnumbers. Nothing is overwritten on your computer.\n</div>"
+            },
+            {
+              "fieldLabel": "Total Marketing Spend",
+              "fieldType": "number",
+              "placeholder": "e.g. 500000",
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "W1 Spend",
+              "fieldType": "number",
+              "placeholder": "optional",
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "W2 Spend",
+              "fieldType": "number",
+              "placeholder": "optional",
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "W3 Spend",
+              "fieldType": "number",
+              "placeholder": "optional",
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "W4 Spend",
+              "fieldType": "number",
+              "placeholder": "optional",
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "W5 Spend",
+              "fieldType": "number",
+              "placeholder": "optional",
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "Spend Lines",
+              "fieldType": "textarea",
+              "placeholder": "Influencers, Influencer, 50000\nPaid Digital Marketing, TikTok, 120000",
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "Workbook",
+              "fieldType": "file",
+              "acceptFileTypes": ".xlsx",
+              "multipleFiles": false,
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {
+          "formTitle": "Step 3 — Marketing spend & workbook",
+          "buttonLabel": "Generate my workbook",
+          "customCss": "\n.form-container, .card {\n  border-radius: 14px;\n  box-shadow: 0 10px 30px rgba(15,61,94,.10);\n}\nh1, .form-header h1 { color: #0F3D5E; letter-spacing: -.01em; }\n.form-header p { color: #4a6b83; }\nbutton[type=submit], .btn-primary {\n  background: #F18F01 !important;\n  border-color: #F18F01 !important;\n  font-weight: 600;\n}\nbutton[type=submit]:hover, .btn-primary:hover {\n  background: #d87f00 !important;\n  border-color: #d87f00 !important;\n}\nlabel, .form-label { color: #0F3D5E; font-weight: 600; }\ninput, textarea, select { border-radius: 8px !important; }\ntextarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }\n.ls-panel {\n  background: #f4f8fb; border: 1px solid #d9e6ef; border-left: 4px solid #2E86AB;\n  border-radius: 10px; padding: 14px 16px; margin: 4px 0 18px; color: #234;\n  font-size: 13.5px; line-height: 1.6;\n}\n.ls-panel code {\n  background: #0F3D5E; color: #fff; padding: 2px 7px; border-radius: 5px;\n  font-family: ui-monospace, Menlo, monospace; font-size: 12.5px;\n}\n.ls-warn { border-left-color: #F18F01; background: #fff8ee; }\n.ls-panel table { width: 100%; border-collapse: collapse; margin-top: 8px; }\n.ls-panel td { padding: 5px 8px; border-top: 1px solid #e3edf4; vertical-align: top; }\n.ls-rtl { direction: rtl; text-align: right; color: #4a6b83; font-size: 13px; }\n"
+        }
+      },
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        320,
+        0
+      ],
+      "id": "417ea36e-9570-4e43-ae08-7abfa8ce5f0c",
+      "name": "Step 3 — Marketing Spend & Workbook",
+      "webhookId": "d56c85e7-038c-44ef-9ff1-a279f57195fd"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "/* ============================================================================\n * Legend Sleep — Forecast Builder engine\n * Patches the uploaded workbook in place: writes Sales_Forecast rows,\n * Marketing_Expense_Forecast rows and the Config week table, then forces a\n * full recalculation so every formula / summary / chart updates on open.\n * Pure JavaScript — no Node built-ins, no npm modules, so the Code node needs\n * no NODE_FUNCTION_ALLOW_BUILTIN and no container restart.\n * ========================================================================== */\n\n/* ---------- weekly seasonality (exact parity with the sheet) ------------- */\nconst WEEK_WEIGHTS = [0.24, 0.15, 0.11, 0.2, 0.3];\nconst WEEKS = ['W1', 'W2', 'W3', 'W4', 'W5'];\n\nconst SHEET = {\n\tconfig: 'xl/worksheets/sheet3.xml',\n\tsales: 'xl/worksheets/sheet4.xml',\n\tmarketing: 'xl/worksheets/sheet5.xml',\n\tpricelist: 'xl/worksheets/sheet2.xml',\n};\nconst SALES_FIRST_ROW = 6;\nconst SALES_LAST_ROW = 935;\nconst MKT_FIRST_ROW = 6;\nconst MKT_LAST_ROW = 205;\n\n/* ========================== ZIP + DEFLATE ================================\n * No Node built-ins. Raw DEFLATE decompression (RFC 1951) is implemented\n * below so the Code node needs no `zlib`, therefore no\n * NODE_FUNCTION_ALLOW_BUILTIN and no container restart.\n *\n * We never need a *compressor*: entries we do not touch are written back\n * byte-for-byte as their original compressed payload (same method, CRC and\n * sizes), and the handful we rewrite are written STORED (uncompressed).\n * ======================================================================== */\n\nconst LEN_BASE = [\n\t3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131,\n\t163, 195, 227, 258,\n];\nconst LEN_EXTRA = [\n\t0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0,\n];\nconst DIST_BASE = [\n\t1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049,\n\t3073, 4097, 6145, 8193, 12289, 16385, 24577,\n];\nconst DIST_EXTRA = [\n\t0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13,\n];\nconst CLEN_ORDER = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15];\n\n/** Canonical Huffman table from a list of code lengths. */\nfunction buildHuffman(lengths, n) {\n\tconst counts = new Int32Array(16);\n\tfor (let i = 0; i < n; i++) counts[lengths[i]]++;\n\tcounts[0] = 0;\n\tconst offsets = new Int32Array(16);\n\tfor (let len = 1; len < 16; len++) offsets[len] = offsets[len - 1] + counts[len - 1];\n\tconst symbols = new Int32Array(n);\n\tfor (let i = 0; i < n; i++) if (lengths[i]) symbols[offsets[lengths[i]]++] = i;\n\treturn { counts, symbols };\n}\n\nfunction inflateRaw(src) {\n\tlet pos = 0;\n\tlet bitBuf = 0;\n\tlet bitCnt = 0;\n\tlet out = new Uint8Array(Math.max(1024, src.length * 6));\n\tlet outLen = 0;\n\n\tconst grow = (need) => {\n\t\tif (outLen + need <= out.length) return;\n\t\tlet cap = out.length;\n\t\twhile (cap < outLen + need) cap *= 2;\n\t\tconst bigger = new Uint8Array(cap);\n\t\tbigger.set(out.subarray(0, outLen));\n\t\tout = bigger;\n\t};\n\tconst bits = (n) => {\n\t\twhile (bitCnt < n) {\n\t\t\tif (pos >= src.length) throw new Error('DEFLATE: input truncated');\n\t\t\tbitBuf |= src[pos++] << bitCnt;\n\t\t\tbitCnt += 8;\n\t\t}\n\t\tconst v = bitBuf & ((1 << n) - 1);\n\t\tbitBuf >>>= n;\n\t\tbitCnt -= n;\n\t\treturn v;\n\t};\n\tconst decode = (h) => {\n\t\tlet code = 0;\n\t\tlet first = 0;\n\t\tlet index = 0;\n\t\tfor (let len = 1; len < 16; len++) {\n\t\t\tcode |= bits(1);\n\t\t\tconst count = h.counts[len];\n\t\t\tif (code - first < count) return h.symbols[index + (code - first)];\n\t\t\tindex += count;\n\t\t\tfirst = (first + count) << 1;\n\t\t\tcode <<= 1;\n\t\t}\n\t\tthrow new Error('DEFLATE: invalid Huffman code');\n\t};\n\n\tlet fixedLit = null;\n\tlet fixedDist = null;\n\tconst buildFixed = () => {\n\t\tif (fixedLit) return;\n\t\tconst l = new Uint8Array(288);\n\t\tfor (let i = 0; i < 144; i++) l[i] = 8;\n\t\tfor (let i = 144; i < 256; i++) l[i] = 9;\n\t\tfor (let i = 256; i < 280; i++) l[i] = 7;\n\t\tfor (let i = 280; i < 288; i++) l[i] = 8;\n\t\tfixedLit = buildHuffman(l, 288);\n\t\tfixedDist = buildHuffman(new Uint8Array(30).fill(5), 30);\n\t};\n\n\tlet last = 0;\n\tdo {\n\t\tlast = bits(1);\n\t\tconst type = bits(2);\n\n\t\tif (type === 0) {\n\t\t\tbitBuf = 0;\n\t\t\tbitCnt = 0;\n\t\t\tconst len = src[pos] | (src[pos + 1] << 8);\n\t\t\tconst nlen = src[pos + 2] | (src[pos + 3] << 8);\n\t\t\tif ((len ^ 0xffff) !== nlen) throw new Error('DEFLATE: stored block length mismatch');\n\t\t\tpos += 4;\n\t\t\tgrow(len);\n\t\t\tout.set(src.subarray(pos, pos + len), outLen);\n\t\t\toutLen += len;\n\t\t\tpos += len;\n\t\t\tcontinue;\n\t\t}\n\t\tif (type === 3) throw new Error('DEFLATE: invalid block type 3');\n\n\t\tlet litTable;\n\t\tlet distTable;\n\t\tif (type === 1) {\n\t\t\tbuildFixed();\n\t\t\tlitTable = fixedLit;\n\t\t\tdistTable = fixedDist;\n\t\t} else {\n\t\t\tconst hlit = bits(5) + 257;\n\t\t\tconst hdist = bits(5) + 1;\n\t\t\tconst hclen = bits(4) + 4;\n\t\t\tconst clen = new Uint8Array(19);\n\t\t\tfor (let i = 0; i < hclen; i++) clen[CLEN_ORDER[i]] = bits(3);\n\t\t\tconst clTable = buildHuffman(clen, 19);\n\t\t\tconst lengths = new Uint8Array(hlit + hdist);\n\t\t\tlet i = 0;\n\t\t\twhile (i < hlit + hdist) {\n\t\t\t\tconst sym = decode(clTable);\n\t\t\t\tif (sym < 16) {\n\t\t\t\t\tlengths[i++] = sym;\n\t\t\t\t} else if (sym === 16) {\n\t\t\t\t\tif (i === 0) throw new Error('DEFLATE: repeat with no previous length');\n\t\t\t\t\tconst prev = lengths[i - 1];\n\t\t\t\t\tlet rep = 3 + bits(2);\n\t\t\t\t\twhile (rep--) lengths[i++] = prev;\n\t\t\t\t} else if (sym === 17) {\n\t\t\t\t\tlet rep = 3 + bits(3);\n\t\t\t\t\twhile (rep--) lengths[i++] = 0;\n\t\t\t\t} else {\n\t\t\t\t\tlet rep = 11 + bits(7);\n\t\t\t\t\twhile (rep--) lengths[i++] = 0;\n\t\t\t\t}\n\t\t\t}\n\t\t\tlitTable = buildHuffman(lengths.subarray(0, hlit), hlit);\n\t\t\tdistTable = buildHuffman(lengths.subarray(hlit), hdist);\n\t\t}\n\n\t\tfor (;;) {\n\t\t\tconst sym = decode(litTable);\n\t\t\tif (sym < 256) {\n\t\t\t\tgrow(1);\n\t\t\t\tout[outLen++] = sym;\n\t\t\t} else if (sym === 256) {\n\t\t\t\tbreak;\n\t\t\t} else {\n\t\t\t\tconst li = sym - 257;\n\t\t\t\tif (li >= LEN_BASE.length) throw new Error('DEFLATE: invalid length symbol');\n\t\t\t\tconst length = LEN_BASE[li] + bits(LEN_EXTRA[li]);\n\t\t\t\tconst di = decode(distTable);\n\t\t\t\tif (di >= DIST_BASE.length) throw new Error('DEFLATE: invalid distance symbol');\n\t\t\t\tconst dist = DIST_BASE[di] + bits(DIST_EXTRA[di]);\n\t\t\t\tif (dist > outLen) throw new Error('DEFLATE: distance beyond output start');\n\t\t\t\tgrow(length);\n\t\t\t\tlet from = outLen - dist;\n\t\t\t\tfor (let k = 0; k < length; k++) out[outLen++] = out[from++];\n\t\t\t}\n\t\t}\n\t} while (!last);\n\n\treturn Buffer.from(out.subarray(0, outLen));\n}\n\n/* ---------------------------------- CRC32 -------------------------------- */\n\nfunction crcTable() {\n\tconst t = new Int32Array(256);\n\tfor (let n = 0; n < 256; n++) {\n\t\tlet c = n;\n\t\tfor (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;\n\t\tt[n] = c;\n\t}\n\treturn t;\n}\nconst CRC_TABLE = crcTable();\nfunction crc32(buf) {\n\tlet c = -1;\n\tfor (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8);\n\treturn (c ^ -1) >>> 0;\n}\n\n/* ---------------------------------- read --------------------------------- */\n\n/**\n * Entries keep both the original compressed payload and a lazily-inflated\n * `data`. Anything left untouched is copied straight back out, so we never\n * need to compress.\n */\nfunction unzip(buf) {\n\tlet eocd = -1;\n\tfor (let i = buf.length - 22; i >= 0 && i > buf.length - 65558; i--) {\n\t\tif (buf.readUInt32LE(i) === 0x06054b50) {\n\t\t\teocd = i;\n\t\t\tbreak;\n\t\t}\n\t}\n\tif (eocd < 0) throw new Error('Not a valid .xlsx (no ZIP end-of-central-directory found)');\n\n\tconst count = buf.readUInt16LE(eocd + 10);\n\tlet ptr = buf.readUInt32LE(eocd + 16);\n\tconst entries = [];\n\n\tfor (let n = 0; n < count; n++) {\n\t\tif (buf.readUInt32LE(ptr) !== 0x02014b50) throw new Error('Corrupt ZIP central directory');\n\t\tconst method = buf.readUInt16LE(ptr + 10);\n\t\tconst crc = buf.readUInt32LE(ptr + 16);\n\t\tconst compSize = buf.readUInt32LE(ptr + 20);\n\t\tconst uncompSize = buf.readUInt32LE(ptr + 24);\n\t\tconst nameLen = buf.readUInt16LE(ptr + 28);\n\t\tconst extraLen = buf.readUInt16LE(ptr + 30);\n\t\tconst commentLen = buf.readUInt16LE(ptr + 32);\n\t\tconst localOff = buf.readUInt32LE(ptr + 42);\n\t\tconst name = buf.slice(ptr + 46, ptr + 46 + nameLen).toString('utf8');\n\n\t\tconst lhNameLen = buf.readUInt16LE(localOff + 26);\n\t\tconst lhExtraLen = buf.readUInt16LE(localOff + 28);\n\t\tconst dataStart = localOff + 30 + lhNameLen + lhExtraLen;\n\t\tconst raw = buf.slice(dataStart, dataStart + compSize);\n\n\t\tif (method !== 0 && method !== 8) {\n\t\t\tthrow new Error(`Unsupported ZIP compression method ${method} for ${name}`);\n\t\t}\n\t\t// Guard against a hostile or corrupt archive inflating without bound.\n\t\tif (uncompSize > 64 * 1024 * 1024) {\n\t\t\tthrow new Error(`Entry ${name} claims ${uncompSize} bytes uncompressed — refusing`);\n\t\t}\n\n\t\tconst entry = { name, raw, method, crc, compSize, uncompSize, dirty: false, _data: null };\n\t\tObject.defineProperty(entry, 'data', {\n\t\t\tget() {\n\t\t\t\tif (this._data === null) {\n\t\t\t\t\tthis._data = this.method === 0 ? Buffer.from(this.raw) : inflateRaw(this.raw);\n\t\t\t\t}\n\t\t\t\treturn this._data;\n\t\t\t},\n\t\t\tset(v) {\n\t\t\t\tthis._data = v;\n\t\t\t\tthis.dirty = true;\n\t\t\t},\n\t\t\tenumerable: true,\n\t\t});\n\t\tentries.push(entry);\n\t\tptr += 46 + nameLen + extraLen + commentLen;\n\t}\n\treturn entries;\n}\n\n/* ---------------------------------- write -------------------------------- */\n\nfunction zip(entries) {\n\tconst locals = [];\n\tconst centrals = [];\n\tlet offset = 0;\n\n\tfor (const e of entries) {\n\t\tconst nameBuf = Buffer.from(e.name, 'utf8');\n\n\t\t// untouched -> copy the original compressed bytes through unchanged;\n\t\t// rewritten -> emit STORED, so no compressor is needed anywhere\n\t\tconst rewritten = e.dirty;\n\t\tconst payload = rewritten ? e.data : e.raw;\n\t\tconst method = rewritten ? 0 : e.method;\n\t\tconst crc = rewritten ? crc32(e.data) : e.crc;\n\t\tconst uncompSize = rewritten ? e.data.length : e.uncompSize;\n\n\t\tconst lh = Buffer.alloc(30);\n\t\tlh.writeUInt32LE(0x04034b50, 0);\n\t\tlh.writeUInt16LE(20, 4);\n\t\tlh.writeUInt16LE(0, 6);\n\t\tlh.writeUInt16LE(method, 8);\n\t\tlh.writeUInt16LE(0, 10);\n\t\tlh.writeUInt16LE(0x21, 12);\n\t\tlh.writeUInt32LE(crc, 14);\n\t\tlh.writeUInt32LE(payload.length, 18);\n\t\tlh.writeUInt32LE(uncompSize, 22);\n\t\tlh.writeUInt16LE(nameBuf.length, 26);\n\t\tlh.writeUInt16LE(0, 28);\n\t\tlocals.push(lh, nameBuf, payload);\n\n\t\tconst cd = Buffer.alloc(46);\n\t\tcd.writeUInt32LE(0x02014b50, 0);\n\t\tcd.writeUInt16LE(20, 4);\n\t\tcd.writeUInt16LE(20, 6);\n\t\tcd.writeUInt16LE(0, 8);\n\t\tcd.writeUInt16LE(method, 10);\n\t\tcd.writeUInt16LE(0, 12);\n\t\tcd.writeUInt16LE(0x21, 14);\n\t\tcd.writeUInt32LE(crc, 16);\n\t\tcd.writeUInt32LE(payload.length, 20);\n\t\tcd.writeUInt32LE(uncompSize, 24);\n\t\tcd.writeUInt16LE(nameBuf.length, 28);\n\t\tcd.writeUInt16LE(0, 30);\n\t\tcd.writeUInt16LE(0, 32);\n\t\tcd.writeUInt16LE(0, 34);\n\t\tcd.writeUInt16LE(0, 36);\n\t\tcd.writeUInt32LE(0, 38);\n\t\tcd.writeUInt32LE(offset, 42);\n\t\tcentrals.push(cd, nameBuf);\n\n\t\toffset += 30 + nameBuf.length + payload.length;\n\t}\n\n\tconst localPart = Buffer.concat(locals);\n\tconst centralPart = Buffer.concat(centrals);\n\tconst eocd = Buffer.alloc(22);\n\teocd.writeUInt32LE(0x06054b50, 0);\n\teocd.writeUInt16LE(0, 4);\n\teocd.writeUInt16LE(0, 6);\n\teocd.writeUInt16LE(entries.length, 8);\n\teocd.writeUInt16LE(entries.length, 10);\n\teocd.writeUInt32LE(centralPart.length, 12);\n\teocd.writeUInt32LE(localPart.length, 16);\n\teocd.writeUInt16LE(0, 20);\n\n\treturn Buffer.concat([localPart, centralPart, eocd]);\n}\n\n/* ========================== XML helpers ================================== */\n\nconst esc = (s) =>\n\tString(s)\n\t\t.replace(/&/g, '&amp;')\n\t\t.replace(/</g, '&lt;')\n\t\t.replace(/>/g, '&gt;')\n\t\t.replace(/\"/g, '&quot;');\n\nconst unesc = (s) =>\n\tString(s)\n\t\t.replace(/&lt;/g, '<')\n\t\t.replace(/&gt;/g, '>')\n\t\t.replace(/&quot;/g, '\"')\n\t\t.replace(/&apos;/g, \"'\")\n\t\t.replace(/&amp;/g, '&');\n\nconst colToNum = (c) => {\n\tlet n = 0;\n\tfor (const ch of c) n = n * 26 + (ch.charCodeAt(0) - 64);\n\treturn n;\n};\n\n/** Read shared strings so we can resolve t=\"s\" cells. */\nfunction readSharedStrings(xml) {\n\tif (!xml) return [];\n\tconst out = [];\n\tconst re = /<si>([\\s\\S]*?)<\\/si>/g;\n\tlet m;\n\twhile ((m = re.exec(xml))) {\n\t\tlet s = '';\n\t\tconst tre = /<t[^>]*>([\\s\\S]*?)<\\/t>/g;\n\t\tlet t;\n\t\twhile ((t = tre.exec(m[1]))) s += unesc(t[1]);\n\t\tout.push(s);\n\t}\n\treturn out;\n}\n\n/** Plain-text value of a cell element (handles shared + inline strings). */\nfunction cellText(cellXml, sst) {\n\tconst tAttr = /\\st=\"([^\"]+)\"/.exec(cellXml);\n\tconst v = /<v>([\\s\\S]*?)<\\/v>/.exec(cellXml);\n\tif (tAttr && tAttr[1] === 's' && v) return sst[parseInt(v[1], 10)] ?? '';\n\tif (tAttr && tAttr[1] === 'inlineStr') {\n\t\tconst is = /<is>[\\s\\S]*?<t[^>]*>([\\s\\S]*?)<\\/t>[\\s\\S]*?<\\/is>/.exec(cellXml);\n\t\treturn is ? unesc(is[1]) : '';\n\t}\n\treturn v ? unesc(v[1]) : '';\n}\n\n/**\n * Patch cells inside a worksheet XML.\n * updates: { \"A6\": {num}|{str}|{formula}|{clear:true}, ... }\n * Preserves each existing cell's style (s=) attribute and any sibling cells\n * (notably the formula columns) untouched.\n */\nfunction patchSheet(xml, updates) {\n\tconst byRow = new Map();\n\tfor (const ref of Object.keys(updates)) {\n\t\tconst m = /^([A-Z]+)(\\d+)$/.exec(ref);\n\t\tconst r = parseInt(m[2], 10);\n\t\tif (!byRow.has(r)) byRow.set(r, {});\n\t\tbyRow.get(r)[m[1]] = updates[ref];\n\t}\n\n\treturn xml.replace(/<row([^>]*)>([\\s\\S]*?)<\\/row>|<row([^>]*)\\/>/g, (full, attrs, inner, selfAttrs) => {\n\t\tconst a = attrs ?? selfAttrs ?? '';\n\t\tconst rm = /\\sr=\"(\\d+)\"/.exec(a);\n\t\tif (!rm) return full;\n\t\tconst rowNum = parseInt(rm[1], 10);\n\t\tconst rowUpdates = byRow.get(rowNum);\n\t\tif (!rowUpdates) return full;\n\n\t\t// collect existing cells\n\t\tconst cells = new Map();\n\t\tconst cre = /<c\\s([^>]*?)\\/>|<c\\s([^>]*?)>([\\s\\S]*?)<\\/c>/g;\n\t\tlet cm;\n\t\twhile ((cm = cre.exec(inner ?? ''))) {\n\t\t\tconst cAttrs = cm[1] ?? cm[2];\n\t\t\tconst cInner = cm[3] ?? null;\n\t\t\tconst ref = /\\sr=\"([A-Z]+\\d+)\"|^r=\"([A-Z]+\\d+)\"/.exec(' ' + cAttrs);\n\t\t\tconst refv = ref ? ref[1] || ref[2] : null;\n\t\t\tif (!refv) continue;\n\t\t\tcells.set(refv.replace(/\\d+$/, ''), { attrs: cAttrs, inner: cInner });\n\t\t}\n\n\t\tfor (const [col, upd] of Object.entries(rowUpdates)) {\n\t\t\tconst ref = col + rowNum;\n\t\t\tconst existing = cells.get(col);\n\t\t\tconst styleM = existing ? /\\ss=\"(\\d+)\"/.exec(existing.attrs) : null;\n\t\t\tconst style = styleM ? ` s=\"${styleM[1]}\"` : '';\n\n\t\t\tif (upd.clear) {\n\t\t\t\tcells.set(col, { attrs: `r=\"${ref}\"${style}`, inner: null });\n\t\t\t} else if (upd.formula !== undefined) {\n\t\t\t\tcells.set(col, {\n\t\t\t\t\tattrs: `r=\"${ref}\"${style}`,\n\t\t\t\t\tinner: `<f>${esc(upd.formula)}</f>`,\n\t\t\t\t});\n\t\t\t} else if (upd.num !== undefined) {\n\t\t\t\tcells.set(col, { attrs: `r=\"${ref}\"${style}`, inner: `<v>${upd.num}</v>` });\n\t\t\t} else {\n\t\t\t\tcells.set(col, {\n\t\t\t\t\tattrs: `r=\"${ref}\"${style} t=\"inlineStr\"`,\n\t\t\t\t\tinner: `<is><t xml:space=\"preserve\">${esc(upd.str)}</t></is>`,\n\t\t\t\t});\n\t\t\t}\n\t\t}\n\n\t\tconst sorted = [...cells.entries()].sort((x, y) => colToNum(x[0]) - colToNum(y[0]));\n\t\tconst body = sorted\n\t\t\t.map(([, c]) => (c.inner === null ? `<c ${c.attrs}/>` : `<c ${c.attrs}>${c.inner}</c>`))\n\t\t\t.join('');\n\t\tconst cleanAttrs = a.replace(/\\s(spans|x14ac:dyDescent)=\"[^\"]*\"/g, '');\n\t\treturn `<row${cleanAttrs}>${body}</row>`;\n\t});\n}\n\n/* ========================== model ======================================== */\n\nconst CHANNEL = {\n\tBRANCHES: 'BRANCHES | فروع',\n\tONLINE: 'ONLINE | إلكتروني',\n\tBOTH: 'Both | كلاهما',\n};\n\nfunction normaliseChannel(tok) {\n\tconst t = (tok || '').toUpperCase();\n\tif (t.includes('BRANCH') || t.includes('فروع')) return CHANNEL.BRANCHES;\n\tif (t.includes('ONLINE') || t.includes('إلكتروني')) return CHANNEL.ONLINE;\n\tif (t.includes('BOTH') || t.includes('كلاهما')) return CHANNEL.BOTH;\n\treturn null;\n}\n\n/** Excel serial from YYYY-MM-DD (1899-12-30 epoch). */\nfunction serial(y, m, d) {\n\treturn Math.round((Date.UTC(y, m - 1, d) - Date.UTC(1899, 11, 30)) / 86400000);\n}\n\nfunction weekRanges(reportMonth) {\n\tconst [y, m] = reportMonth.split('-').map(Number);\n\tconst lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();\n\tconst bounds = [\n\t\t[1, 7],\n\t\t[8, 14],\n\t\t[15, 21],\n\t\t[22, 28],\n\t\t[29, lastDay],\n\t];\n\treturn bounds.map(([a, b]) => [serial(y, m, a), serial(y, m, Math.min(b, lastDay))]);\n}\n\n/**\n * Split a monthly quantity across the 5 weeks.\n * Honours pinned weeks; remaining quantity is distributed over the unpinned\n * weeks using the sheet's weights, renormalised.\n */\nfunction splitQty(total, pins) {\n\tconst out = [null, null, null, null, null];\n\tlet pinned = 0;\n\tfor (const [idx, qty] of Object.entries(pins || {})) {\n\t\tout[idx] = qty;\n\t\tpinned += qty;\n\t}\n\tconst remaining = total - pinned;\n\tconst freeIdx = out.map((v, i) => (v === null ? i : -1)).filter((i) => i >= 0);\n\tconst freeWeight = freeIdx.reduce((s, i) => s + WEEK_WEIGHTS[i], 0);\n\tfor (const i of freeIdx) {\n\t\tout[i] = freeWeight > 0 ? (remaining * WEEK_WEIGHTS[i]) / freeWeight : 0;\n\t}\n\treturn out;\n}\n\n/** Parse one forecast line into {sku, channel, weeks[5]} or throws. */\nfunction parseLine(line, defaultChannel) {\n\tconst parts = line\n\t\t.split(',')\n\t\t.map((s) => s.trim())\n\t\t.filter((s) => s !== '');\n\tif (parts.length < 2) throw new Error(`need at least \"SKU, quantity\" — got \"${line}\"`);\n\n\tconst sku = parts[0];\n\tlet channel = defaultChannel;\n\tconst pins = {};\n\tconst nums = [];\n\n\tfor (const p of parts.slice(1)) {\n\t\tconst ch = normaliseChannel(p);\n\t\tconst pin = /^W([1-5])\\s*=\\s*(-?[\\d.]+)$/i.exec(p);\n\t\tif (pin) {\n\t\t\tpins[Number(pin[1]) - 1] = Number(pin[2]);\n\t\t} else if (ch) {\n\t\t\tchannel = ch;\n\t\t} else if (/^-?[\\d.]+$/.test(p)) {\n\t\t\tnums.push(Number(p));\n\t\t} else {\n\t\t\tthrow new Error(`unrecognised token \"${p}\" in \"${line}\"`);\n\t\t}\n\t}\n\n\tlet weeks;\n\tif (nums.length === 5) {\n\t\tweeks = nums; // explicit per-week\n\t} else if (nums.length === 1) {\n\t\tweeks = splitQty(nums[0], pins);\n\t} else {\n\t\tthrow new Error(`give either 1 monthly quantity or 5 weekly quantities — got ${nums.length} in \"${line}\"`);\n\t}\n\tif (weeks.some((w) => w < 0)) throw new Error(`negative units in \"${line}\"`);\n\treturn { sku, channel, weeks };\n}\n\n/* ========================== main ========================================= */\n\nfunction buildForecast(templateBuffer, input) {\n\tconst entries = unzip(templateBuffer);\n\tconst get = (n) => entries.find((e) => e.name === n);\n\tconst sst = readSharedStrings(get('xl/sharedStrings.xml')?.data.toString('utf8'));\n\n\tconst salesEntry = get(SHEET.sales);\n\tconst mktEntry = get(SHEET.marketing);\n\tconst cfgEntry = get(SHEET.config);\n\tconst plEntry = get(SHEET.pricelist);\n\tif (!salesEntry || !mktEntry || !cfgEntry || !plEntry) {\n\t\tthrow new Error('Uploaded file does not look like the Legend Sleep forecast workbook (missing expected sheets)');\n\t}\n\n\tconst salesXml = salesEntry.data.toString('utf8');\n\tconst plXml = plEntry.data.toString('utf8');\n\n\t/* --- learn SKU -> category from the workbook itself (ground truth) --- */\n\tconst skuCategory = new Map();\n\tconst rowRe = /<row[^>]*\\sr=\"(\\d+)\"[^>]*>([\\s\\S]*?)<\\/row>/g;\n\tlet rm;\n\twhile ((rm = rowRe.exec(salesXml))) {\n\t\tconst r = Number(rm[1]);\n\t\tif (r < SALES_FIRST_ROW) continue;\n\t\tconst inner = rm[2];\n\t\tconst pick = (col) => {\n\t\t\tconst m = new RegExp(`<c\\\\s[^>]*r=\"${col}${r}\"[^>]*(?:/>|>([\\\\s\\\\S]*?)</c>)`).exec(inner);\n\t\t\treturn m ? cellText(m[0], sst) : '';\n\t\t};\n\t\tconst sku = pick('D');\n\t\tconst cat = pick('B');\n\t\tif (sku && cat && !skuCategory.has(sku)) skuCategory.set(sku, cat);\n\t}\n\n\t/* --- known SKUs from the Pricelist (for validation) --- */\n\tconst knownSkus = new Set();\n\tconst plNames = new Map();\n\tconst plRowRe = /<row[^>]*\\sr=\"(\\d+)\"[^>]*>([\\s\\S]*?)<\\/row>/g;\n\twhile ((rm = plRowRe.exec(plXml))) {\n\t\tconst r = Number(rm[1]);\n\t\tif (r < 4) continue;\n\t\tconst inner = rm[2];\n\t\tconst pick = (col) => {\n\t\t\tconst m = new RegExp(`<c\\\\s[^>]*r=\"${col}${r}\"[^>]*(?:/>|>([\\\\s\\\\S]*?)</c>)`).exec(inner);\n\t\t\treturn m ? cellText(m[0], sst) : '';\n\t\t};\n\t\tconst sku = pick('A');\n\t\tif (sku) {\n\t\t\tknownSkus.add(sku);\n\t\t\tplNames.set(sku, pick('B'));\n\t\t}\n\t}\n\n\t/**\n\t * Category fallback for SKUs never forecast before.\n\t *\n\t * ORDER IS LOAD-BEARING — most specific first. Product names are compound,\n\t * so a bundle like \"رويال بوكس بمفرش لورين\" (a Royal Box *containing* a\n\t * bedspread) must match 'رويال' before 'مفرش', and \"واقي مرتبة\" (mattress\n\t * protector) must match before 'مرتبة'. This exact permutation scores\n\t * 158/160 (98.8%) against the categories already in the workbook; a wrong\n\t * order drops it to 58%. Do not reorder without re-scoring.\n\t */\n\tconst RULES = [\n\t\t['Mattress Toppers', ['توبر', 'واقي مرتبة', 'لباد']],\n\t\t['Pillows', ['مخد', 'وسادة']],\n\t\t['Royal Boxes', ['رويال']],\n\t\t['Comforter Sets', ['لحاف', 'مفرش', 'كمفرتر', 'باقة الدف']],\n\t\t['Mattresses', ['مرتبة', 'مراتب', 'سرير']],\n\t];\n\n\t/**\n\t * Resolution order: curated Data Table > the workbook's own history >\n\t * keyword guess. `catalog` is whatever the Data Table node handed us; an\n\t * empty table simply degrades to the previous behaviour.\n\t */\n\tconst catalogCategory = new Map();\n\tfor (const row of input.catalog ?? []) {\n\t\tconst sku = String(row.sku ?? '').trim();\n\t\tconst cat = String(row.category ?? '').trim();\n\t\tif (sku && cat) catalogCategory.set(sku, cat);\n\t}\n\n\tconst classify = (sku) => {\n\t\tif (catalogCategory.has(sku)) return catalogCategory.get(sku);\n\t\tif (skuCategory.has(sku)) return skuCategory.get(sku);\n\t\tconst n = plNames.get(sku) || '';\n\t\tfor (const [cat, kws] of RULES) if (kws.some((k) => n.includes(k))) return cat;\n\t\treturn null; // unclassifiable — caller warns rather than guessing wrong\n\t};\n\n\t/* --- parse the forecast lines --- */\n\tconst defaultChannel = normaliseChannel(input.defaultChannel) || CHANNEL.ONLINE;\n\tconst warnings = [];\n\tconst rows = [];\n\n\tconst lines = (input.forecastLines || '')\n\t\t.split(/\\r?\\n/)\n\t\t.map((l) => l.trim())\n\t\t.filter((l) => l && !l.startsWith('#'));\n\n\tfor (const line of lines) {\n\t\tlet parsed;\n\t\ttry {\n\t\t\tparsed = parseLine(line, defaultChannel);\n\t\t} catch (e) {\n\t\t\tthrow new Error(`Line \"${line}\" — ${e.message}`);\n\t\t}\n\t\tif (!knownSkus.has(parsed.sku)) {\n\t\t\twarnings.push(`SKU \"${parsed.sku}\" is not in the Pricelist — its price and revenue will be blank.`);\n\t\t}\n\t\tconst category = classify(parsed.sku);\n\t\tif (!category) {\n\t\t\twarnings.push(\n\t\t\t\t`SKU \"${parsed.sku}\" could not be categorised — add it to the sku_catalog Data Table. Category left blank, so it will not appear in the Sales_Summary category rollup.`,\n\t\t\t);\n\t\t}\n\t\tconst channels = parsed.channel === CHANNEL.BOTH ? [CHANNEL.BRANCHES, CHANNEL.ONLINE] : [parsed.channel];\n\t\tfor (const ch of channels) {\n\t\t\tparsed.weeks.forEach((units, i) => {\n\t\t\t\trows.push({\n\t\t\t\t\tchannel: ch,\n\t\t\t\t\tcategory: category ?? '',\n\t\t\t\t\tsku: parsed.sku,\n\t\t\t\t\tweek: WEEKS[i],\n\t\t\t\t\tunits: parsed.channel === CHANNEL.BOTH ? units / 2 : units,\n\t\t\t\t});\n\t\t\t});\n\t\t}\n\t}\n\n\tconst capacity = SALES_LAST_ROW - SALES_FIRST_ROW + 1;\n\tif (rows.length > capacity) {\n\t\tthrow new Error(\n\t\t\t`${rows.length} forecast rows needed but the workbook has room for ${capacity} (${capacity / 5} SKU/channel lines). Trim the input.`,\n\t\t);\n\t}\n\n\t/* --- write Sales_Forecast --- */\n\tconst salesUpdates = {};\n\tfor (let i = 0; i < capacity; i++) {\n\t\tconst r = SALES_FIRST_ROW + i;\n\t\tconst row = rows[i];\n\t\tif (row) {\n\t\t\tsalesUpdates[`A${r}`] = { str: row.channel };\n\t\t\tsalesUpdates[`B${r}`] = { str: row.category };\n\t\t\tsalesUpdates[`D${r}`] = { str: row.sku };\n\t\t\tsalesUpdates[`E${r}`] = { str: row.week };\n\t\t\tsalesUpdates[`F${r}`] = { num: Number(row.units.toFixed(6)) };\n\t\t} else {\n\t\t\tfor (const c of ['A', 'B', 'D', 'E', 'F', 'J']) salesUpdates[`${c}${r}`] = { clear: true };\n\t\t}\n\t}\n\tsalesEntry.data = Buffer.from(patchSheet(salesXml, salesUpdates), 'utf8');\n\n\t/* --- write Marketing_Expense_Forecast (only if spend was supplied) --- */\n\tlet mktRows = [];\n\tconst detail = (input.spendLines || '')\n\t\t.split(/\\r?\\n/)\n\t\t.map((l) => l.trim())\n\t\t.filter((l) => l && !l.startsWith('#'));\n\n\tif (detail.length) {\n\t\tfor (const line of detail) {\n\t\t\tconst p = line.split(',').map((s) => s.trim());\n\t\t\tif (p.length < 3) throw new Error(`Spend line \"${line}\" — need \"category, platform, amount\"`);\n\t\t\tconst amount = Number(p[p.length - 1]);\n\t\t\tif (!isFinite(amount)) throw new Error(`Spend line \"${line}\" — amount is not a number`);\n\t\t\tconst weekly = splitQty(amount, {});\n\t\t\tweekly.forEach((amt, i) =>\n\t\t\t\tmktRows.push({\n\t\t\t\t\tchannel: normaliseChannel(p[3]) || CHANNEL.ONLINE,\n\t\t\t\t\tcategory: p[0],\n\t\t\t\t\tplatform: p[1],\n\t\t\t\t\tweek: WEEKS[i],\n\t\t\t\t\tbudget: Number(amt.toFixed(2)),\n\t\t\t\t}),\n\t\t\t);\n\t\t}\n\t} else if (input.spendPerWeek && input.spendPerWeek.some((v) => Number(v) > 0)) {\n\t\tinput.spendPerWeek.forEach((amt, i) =>\n\t\t\tmktRows.push({\n\t\t\t\tchannel: defaultChannel,\n\t\t\t\tcategory: 'Paid Digital Marketing',\n\t\t\t\tplatform: 'Other',\n\t\t\t\tweek: WEEKS[i],\n\t\t\t\tbudget: Number(Number(amt || 0).toFixed(2)),\n\t\t\t}),\n\t\t);\n\t} else if (Number(input.spendTotal) > 0) {\n\t\tsplitQty(Number(input.spendTotal), {}).forEach((amt, i) =>\n\t\t\tmktRows.push({\n\t\t\t\tchannel: defaultChannel,\n\t\t\t\tcategory: 'Paid Digital Marketing',\n\t\t\t\tplatform: 'Other',\n\t\t\t\tweek: WEEKS[i],\n\t\t\t\tbudget: Number(amt.toFixed(2)),\n\t\t\t}),\n\t\t);\n\t}\n\n\tif (mktRows.length) {\n\t\tconst mktCapacity = MKT_LAST_ROW - MKT_FIRST_ROW + 1;\n\t\tif (mktRows.length > mktCapacity) {\n\t\t\tthrow new Error(`${mktRows.length} spend rows needed but the workbook has room for ${mktCapacity}.`);\n\t\t}\n\t\tconst mktUpdates = {};\n\t\tfor (let i = 0; i < mktCapacity; i++) {\n\t\t\tconst r = MKT_FIRST_ROW + i;\n\t\t\tconst row = mktRows[i];\n\t\t\tif (row) {\n\t\t\t\tmktUpdates[`A${r}`] = { str: row.channel };\n\t\t\t\tmktUpdates[`B${r}`] = { str: row.category };\n\t\t\t\tmktUpdates[`C${r}`] = { str: row.platform };\n\t\t\t\tmktUpdates[`D${r}`] = { str: row.week };\n\t\t\t\tmktUpdates[`E${r}`] = { num: row.budget };\n\t\t\t\t// column G has no formula beyond row 75 in the template — add it\n\t\t\t\tmktUpdates[`G${r}`] = {\n\t\t\t\t\tformula: `IF(AND(ISNUMBER(F${r}),ISNUMBER(E${r})),F${r}-E${r},\"\")`,\n\t\t\t\t};\n\t\t\t} else {\n\t\t\t\tfor (const c of ['A', 'B', 'C', 'D', 'E', 'F', 'G']) mktUpdates[`${c}${r}`] = { clear: true };\n\t\t\t}\n\t\t}\n\t\tmktEntry.data = Buffer.from(patchSheet(mktEntry.data.toString('utf8'), mktUpdates), 'utf8');\n\t}\n\n\t/* --- write Config: report month + regenerate the week table (fixes D4) - */\n\tconst cfgUpdates = { B3: { str: input.reportMonth } };\n\tweekRanges(input.reportMonth).forEach(([a, b], i) => {\n\t\tcfgUpdates[`A${11 + i}`] = { str: WEEKS[i] };\n\t\tcfgUpdates[`B${11 + i}`] = { num: a };\n\t\tcfgUpdates[`C${11 + i}`] = { num: b };\n\t});\n\tcfgEntry.data = Buffer.from(patchSheet(cfgEntry.data.toString('utf8'), cfgUpdates), 'utf8');\n\n\t/* --- force full recalculation, drop the stale calc chain --------------- */\n\tconst wb = get('xl/workbook.xml');\n\tlet wbXml = wb.data.toString('utf8');\n\twbXml = wbXml.replace(/<calcPr[^>]*\\/>/, '<calcPr calcId=\"191029\" fullCalcOnLoad=\"1\"/>');\n\tif (!/fullCalcOnLoad/.test(wbXml)) {\n\t\twbXml = wbXml.replace('</workbook>', '<calcPr calcId=\"191029\" fullCalcOnLoad=\"1\"/></workbook>');\n\t}\n\twb.data = Buffer.from(wbXml, 'utf8');\n\n\tconst kept = entries.filter((e) => e.name !== 'xl/calcChain.xml');\n\tconst rels = kept.find((e) => e.name === 'xl/_rels/workbook.xml.rels');\n\trels.data = Buffer.from(\n\t\trels.data.toString('utf8').replace(/<Relationship[^>]*calcChain\\.xml\"\\/>/, ''),\n\t\t'utf8',\n\t);\n\tconst ct = kept.find((e) => e.name === '[Content_Types].xml');\n\tct.data = Buffer.from(\n\t\tct.data.toString('utf8').replace(/<Override[^>]*calcChain\\.xml\"[^>]*\\/>/, ''),\n\t\t'utf8',\n\t);\n\n\t/* --- summary for the completion screen -------------------------------- */\n\tconst totalUnits = rows.reduce((s, r) => s + r.units, 0);\n\tconst byWeek = WEEKS.map((w) => rows.filter((r) => r.week === w).reduce((s, r) => s + r.units, 0));\n\tconst spendTotal = mktRows.reduce((s, r) => s + r.budget, 0);\n\n\treturn {\n\t\tbuffer: zip(kept),\n\t\tsummary: {\n\t\t\treportMonth: input.reportMonth,\n\t\t\tskuLines: lines.length,\n\t\t\tforecastRows: rows.length,\n\t\t\ttotalUnits: Number(totalUnits.toFixed(3)),\n\t\t\tunitsByWeek: byWeek.map((v) => Number(v.toFixed(3))),\n\t\t\tmarketingRows: mktRows.length,\n\t\t\tmarketingTotal: Number(spendTotal.toFixed(2)),\n\t\t\tweekDates: weekRanges(input.reportMonth),\n\t\t\twarnings,\n\t\t},\n\t};\n}\n\n\n/* ===================== n8n glue ========================================== */\n\nconst setup = $('Step 1 — Setup').first().json;\nconst skuStep = $('Step 2 — SKU Quantities').first().json;\nconst spendStep = $input.first().json;\n\n/**\n * Curated SKU -> category from the sku_catalog Data Table. Highest-priority\n * source; an empty or absent table just degrades to the workbook's own\n * categories, so the workflow still runs before the table is seeded.\n */\nlet catalog = [];\ntry {\n\tcatalog = $('Get SKU Catalog')\n\t\t.all()\n\t\t.map((i) => i.json)\n\t\t.filter((r) => r && r.sku);\n} catch (e) {\n\tcatalog = [];\n}\n\n// the workbook is uploaded on the LAST form page, so its binary is on this\n// node's own input — the only place getBinaryDataBuffer can read from\nconst incoming = $input.first().binary ?? {};\nconst key =\n\tObject.keys(incoming).find((k) => (incoming[k].fileName ?? '').toLowerCase().endsWith('.xlsx')) ??\n\tObject.keys(incoming)[0];\nif (!key) {\n\tthrow new Error('No .xlsx was uploaded on the last step. Attach your current workbook and try again.');\n}\nconst templateBuffer = await this.helpers.getBinaryDataBuffer(0, key);\n\nconst reportMonth = String(setup['Report Month'] ?? '').trim();\nif (!/^\\d{4}-\\d{2}$/.test(reportMonth)) {\n\tthrow new Error(`Report Month must look like 2026-08 — got \"${reportMonth}\"`);\n}\n\nconst perWeek = ['W1', 'W2', 'W3', 'W4', 'W5'].map((w) => Number(spendStep[`${w} Spend`] ?? 0));\n\nconst result = buildForecast(templateBuffer, {\n\treportMonth,\n\tdefaultChannel: setup['Default Channel'],\n\tforecastLines: skuStep['Forecast Lines'],\n\tspendTotal: spendStep['Total Marketing Spend'],\n\tspendPerWeek: perWeek,\n\tspendLines: spendStep['Spend Lines'],\n\tcatalog,\n});\n\nconst outName = `Sales Forecast ${reportMonth} (generated).xlsx`;\nconst binary = await this.helpers.prepareBinaryData(\n\tresult.buffer,\n\toutName,\n\t'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',\n);\n\nreturn [{ json: { ...result.summary, catalogRowsUsed: catalog.length }, binary: { forecast: binary } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        540,
+        0
+      ],
+      "id": "d075ccbf-cdca-4e5a-aada-0ff15c0dbd0a",
+      "name": "Build Workbook"
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "returnBinary",
+        "inputDataFieldName": "forecast",
+        "completionTitle": "✅ Your forecast workbook is ready",
+        "completionMessage": "={{ 'Report month: ' + $json.reportMonth + '\\nSKU lines: ' + $json.skuLines + '  →  forecast rows: ' + $json.forecastRows + '\\nTotal units: ' + $json.totalUnits + '\\nUnits by week: ' + $json.unitsByWeek.join(' / ') + '\\nMarketing rows: ' + $json.marketingRows + '  total: ' + $json.marketingTotal + ' SAR' + ($json.warnings.length ? '\\n\\n⚠️ ' + $json.warnings.join('\\n⚠️ ') : '') }}",
+        "options": {
+          "customCss": "\n.form-container, .card {\n  border-radius: 14px;\n  box-shadow: 0 10px 30px rgba(15,61,94,.10);\n}\nh1, .form-header h1 { color: #0F3D5E; letter-spacing: -.01em; }\n.form-header p { color: #4a6b83; }\nbutton[type=submit], .btn-primary {\n  background: #F18F01 !important;\n  border-color: #F18F01 !important;\n  font-weight: 600;\n}\nbutton[type=submit]:hover, .btn-primary:hover {\n  background: #d87f00 !important;\n  border-color: #d87f00 !important;\n}\nlabel, .form-label { color: #0F3D5E; font-weight: 600; }\ninput, textarea, select { border-radius: 8px !important; }\ntextarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }\n.ls-panel {\n  background: #f4f8fb; border: 1px solid #d9e6ef; border-left: 4px solid #2E86AB;\n  border-radius: 10px; padding: 14px 16px; margin: 4px 0 18px; color: #234;\n  font-size: 13.5px; line-height: 1.6;\n}\n.ls-panel code {\n  background: #0F3D5E; color: #fff; padding: 2px 7px; border-radius: 5px;\n  font-family: ui-monospace, Menlo, monospace; font-size: 12.5px;\n}\n.ls-warn { border-left-color: #F18F01; background: #fff8ee; }\n.ls-panel table { width: 100%; border-collapse: collapse; margin-top: 8px; }\n.ls-panel td { padding: 5px 8px; border-top: 1px solid #e3edf4; vertical-align: top; }\n.ls-rtl { direction: rtl; text-align: right; color: #4a6b83; font-size: 13px; }\n"
+        }
+      },
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        760,
+        0
+      ],
+      "id": "6c320b8c-05c0-4f8a-bb63-b9e728499160",
+      "name": "Download",
+      "webhookId": "bdecebe4-8bf2-47c9-8c1d-2f778742a1fa"
+    },
+    {
+      "parameters": {
+        "content": "## Legend Sleep — Forecast Builder\n\nTurns **SKU + monthly quantity** into a fully calculated forecast workbook.\n\n**No setup.** Import and go — the Code node is pure JavaScript with zero\n`require()` calls, so it needs no `NODE_FUNCTION_ALLOW_BUILTIN` and no\ncontainer restart.\n\n**How it works**\n\n1. The uploaded workbook is used as the *template* — so all 11 tabs, every\n   formula, all 6 charts and the Dashboard survive untouched. Parts we don't\n   touch are copied through as their original compressed bytes; the 6 we\n   rewrite are stored uncompressed (hence ~900 KB out vs 243 KB in).\n2. The Code node writes only the input columns:\n   `Sales_Forecast` A,B,D,E,F · `Marketing_Expense_Forecast` A–E,G ·\n   `Config & Assumptions` B3 + the W1–W5 date table.\n3. Product name, category and unit price are **not** written — the workbook's own\n   VLOOKUPs fill them. Category is learnt from the workbook itself.\n4. `fullCalcOnLoad` is set and the stale calc chain dropped, so Excel recalculates\n   everything on open.\n\n**Weekly split** — the sheet's own curve: 24 / 15 / 11 / 20 / 30 %.\n\n**SKU catalog** — `Get SKU Catalog` reads a Data Table named `sku_catalog`\n(seed it from `docs/sku-catalog.csv`, 726 rows). Category resolution order:\n\n`sku_catalog` → the workbook's own history → Arabic-name keywords\n\nThe node is set to continue on error, so a missing or empty table does not break\nthe run — it just falls back. Correct a category once in the table and it sticks\nfor every future month.\n\n**Also fixed automatically:** the Config week table is regenerated from the report\nmonth, so it no longer drifts out of sync (defect D4 in\n`docs/sales-forecast-workbook.md`).\n",
+        "height": 560,
+        "width": 460,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -900,
+        -180
+      ],
+      "id": "733118fb-73c3-4a93-931b-b27faa2c78ec",
+      "name": "Read me"
+    }
+  ],
+  "connections": {
+    "Step 1 — Setup": {
+      "main": [
+        [
+          {
+            "node": "Step 2 — SKU Quantities",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 2 — SKU Quantities": {
+      "main": [
+        [
+          {
+            "node": "Get SKU Catalog",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get SKU Catalog": {
+      "main": [
+        [
+          {
+            "node": "Step 3 — Marketing Spend & Workbook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step 3 — Marketing Spend & Workbook": {
+      "main": [
+        [
+          {
+            "node": "Build Workbook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Workbook": {
+      "main": [
+        [
+          {
+            "node": "Download",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "legend-sleep-forecast-builder"
+  }
+}

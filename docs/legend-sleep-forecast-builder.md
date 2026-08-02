@@ -24,11 +24,12 @@ restart, no files on the server. Both Code nodes are pure JavaScript with zero
 JSON is all there is.
 
 1. Workflows → **Import from File** (or **Import from URL**) → the JSON above
-2. **Activate** the workflow
-3. Open the **Open Page** node, copy its **Production URL**, open it in a browser:
+2. **Publish** the workflow — on this n8n version that button replaces the old Active toggle. Production webhooks only exist once published
+3. Open it in a browser:
    ```
-   https://<your-n8n-host>/webhook/legend-forecast
+   https://legend-n8n.aitoolsofficial.com/webhook/legend-forecast
    ```
+   (Any other instance: take the **Open Page** node's Production URL.)
 
 That URL *is* the app. Bookmark it.
 
@@ -122,11 +123,13 @@ Derived automatically:
   29–month end), fixing defect **D4**, where the current file still says May.
 
 Afterwards `fullCalcOnLoad` is set and the stale calc chain dropped, so Excel
-recalculates everything on open.
+recalculates everything on open. Cached formula results are also stripped from
+every rewritten row, so a cleared row can't leave last month's answer behind for
+anything that reads the file without recalculating.
 
 **On file size.** Untouched parts are copied through as their original compressed
 bytes; the six rewritten parts are stored uncompressed, because shipping a DEFLATE
-*compressor* in a Code node isn't worth it. Output is ~900 KB from a 243 KB input.
+*compressor* in a Code node isn't worth it. Output is ~780 KB from a 243 KB input.
 Excel doesn't mind, and re-saving shrinks it.
 
 ---
@@ -139,11 +142,30 @@ Exact parity with the sheet:
 |---:|---:|---:|---:|---:|
 | 24% | 15% | 11% | 20% | 30% |
 
-Pinned weeks are honoured first; the remainder is spread over the unpinned weeks
-on their renormalised weights, so the monthly total always ties. Pinning W3 to 200
-out of 400 gives `53.93 / 33.71 / 200 / 44.94 / 67.42` — summing to exactly 400.
+**Always whole units.** You cannot sell 4.8 mattresses, so the split uses the
+largest-remainder (Hamilton) method: floor each exact share, then give the spare
+units to the weeks with the largest fractional parts.
 
-Units stay fractional, matching the current file (defect **D8**).
+```
+20 units   exact  4.8  3.0  2.2  4.0  6.0   = 20
+           floor  4    3    2    4    6     = 19, one short
+           W1 has the largest fraction (.8) → takes the spare unit
+           final  5    3    2    4    6     = 20  ✓
+```
+
+The integers **always** sum back to the monthly quantity — that is the point of
+largest-remainder over rounding each week independently, which drifts. This fixes
+defect **D8**. Figures will differ from the fractional values in the old file,
+but those were never sellable quantities.
+
+Pinned weeks are honoured exactly and the remainder is apportioned the same way:
+pinning W3 to 200 of 400 gives `54 / 34 / 200 / 45 / 67` — exactly 400.
+
+`Both` halves each week into two whole numbers whose sum is unchanged, so
+splitting across channels never invents or loses a unit.
+
+Preview and server run **identical** code here, verified equal for every quantity
+from 0 to 3000 — what you see in the week boxes is exactly what gets written.
 
 ---
 

@@ -103,7 +103,7 @@
     },
     {
       "parameters": {
-        "fromEmail": "notifications.vmeals@gmail.com",
+        "fromEmail": "noreply@tritechtechnology.com",
         "toEmail": "={{ $('On form submission').item.json['Send To Email'] }}",
         "subject": "=Salla–Odoo order data — {{ $json.period }}",
         "emailFormat": "html",

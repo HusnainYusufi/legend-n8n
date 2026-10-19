@@ -97,7 +97,7 @@
         "toEmail": "={{ $('On form submission').item.json['Send To Email'] }}",
         "subject": "=Salla → Odoo import — {{ $('On form submission').item.json['Report Date'] }}",
         "emailFormat": "html",
-        "html": "=<p>Attached is the generated Odoo import sheet.</p><p>Orders: {{ $json.orders }} &middot; Order lines: {{ $json.orderLines }}</p>",
+        "html": "=<p>Attached is the generated Odoo import sheet.</p><p>Orders: {{ $json.orders }} &middot; Order lines: {{ $json.orderLines }}</p><p>Customer Series # {{ $('On form submission').item.json['Series Number'] }}</p>",
         "options": {
           "fileAttachments": "data"
         }

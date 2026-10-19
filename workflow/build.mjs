@@ -92,7 +92,8 @@ const workflow = {
 				emailFormat: 'html',
 				html:
 					'=<p>Attached is the generated Odoo import sheet.</p>' +
-					'<p>Orders: {{ $json.orders }} &middot; Order lines: {{ $json.orderLines }}</p>',
+					'<p>Orders: {{ $json.orders }} &middot; Order lines: {{ $json.orderLines }}</p>' +
+					"<p>Customer Series # {{ $('On form submission').item.json['Series Number'] }}</p>",
 				options: { fileAttachments: 'data' },
 			},
 			id: '66666666-6666-6666-6666-666666666666',
